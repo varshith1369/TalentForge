@@ -3,32 +3,48 @@ package com.talentforge.ui;
 import com.formdev.flatlaf.FlatClientProperties;
 import com.talentforge.auth.AuthService;
 import com.talentforge.auth.AuthService.AuthResult;
+import com.talentforge.auth.GoogleAuthService;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 
 /**
- * Advanced Login/Signup screen: gradient + dot-grid branding panel with a
- * floating stat badge, a drop-shadow card containing a segmented Login/Sign Up
- * toggle, icon-adorned fields with placeholders, a built-in password reveal
- * button, and a smooth cross-dissolve animation when switching sections.
+ * Advanced Login/Signup screen with a 3-tab header (Log In / Sign Up /
+ * Forgot Password), icon-adorned fields with live validation, a Google
+ * sign-in option, and a smooth cross-dissolve between sections.
  */
 public class LoginSignupPanel extends JPanel {
 
     private final CrossFadePanel crossFade = new CrossFadePanel();
     private final AuthService authService = new AuthService();
 
-    private JButton loginToggleBtn;
-    private JButton signupToggleBtn;
+    private JButton loginTab, signupTab, forgotTab;
 
     private JTextField loginEmailField;
     private JPasswordField loginPasswordField;
     private JLabel loginErrorLabel;
+    private JButton loginSubmitBtn;
 
     private JTextField signupNameField;
     private JTextField signupEmailField;
     private JPasswordField signupPasswordField;
     private JLabel signupErrorLabel;
+    private JButton signupSubmitBtn;
+
+    private JPanel loginFormPanel;
+    private JPanel signupFormPanel;
+
+    // Forgot password inline state
+    private CardLayout forgotStepLayout;
+    private JPanel forgotStepContainer;
+    private JTextField forgotEmailField;
+    private JLabel forgotEmailError;
+    private String forgotVerifiedEmail;
+    private JPasswordField forgotNewPassword;
+    private JPasswordField forgotConfirmPassword;
+    private JLabel forgotResetError;
 
     private OnAuthSuccess onAuthSuccess;
 
@@ -42,7 +58,7 @@ public class LoginSignupPanel extends JPanel {
 
     public LoginSignupPanel() {
         setLayout(new BorderLayout());
-        setBackground(new Color(243, 244, 248));
+        setOpaque(true);
 
         BrandingPanel branding = new BrandingPanel();
         branding.add(branding.buildContent());
@@ -53,13 +69,14 @@ public class LoginSignupPanel extends JPanel {
         JPanel wrapper = new JPanel();
         wrapper.setOpaque(false);
         wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.Y_AXIS));
-        wrapper.setBorder(BorderFactory.createEmptyBorder(30, 40, 26, 40));
-        wrapper.add(buildSegmentedToggle());
-        wrapper.add(Box.createVerticalStrut(26));
+        wrapper.setBorder(BorderFactory.createEmptyBorder(26, 40, 22, 40));
+        wrapper.add(buildTabHeader());
+        wrapper.add(Box.createVerticalStrut(20));
 
         crossFade.addCard(buildLoginCard(), "LOGIN");
         crossFade.addCard(buildSignupCard(), "SIGNUP");
-        crossFade.setPreferredSize(new Dimension(320, 380));
+        crossFade.addCard(buildForgotCard(), "FORGOT");
+        crossFade.setPreferredSize(new Dimension(340, 430));
         wrapper.add(crossFade);
 
         ShadowPanel shadowCard = new ShadowPanel(new BorderLayout());
@@ -68,74 +85,94 @@ public class LoginSignupPanel extends JPanel {
 
         add(branding, BorderLayout.WEST);
         add(outer, BorderLayout.CENTER);
+        add(new FooterBar(), BorderLayout.SOUTH);
 
         SwingUtilities.invokeLater(() -> showSection("LOGIN"));
     }
 
-    private JPanel buildSegmentedToggle() {
-        JPanel toggle = new JPanel(new GridLayout(1, 2, 4, 0));
-        toggle.setOpaque(true);
-        toggle.setBackground(new Color(243, 244, 246));
-        toggle.putClientProperty(FlatClientProperties.STYLE, "arc:20");
-        toggle.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
-        toggle.setMaximumSize(new Dimension(320, 44));
-        toggle.setPreferredSize(new Dimension(320, 44));
+    @Override
+    public Color getBackground() {
+        // Always reflects the live theme value instead of a one-time snapshot
+        return Theme.PAGE_BG;
+    }
 
-        loginToggleBtn = new JButton("Log In");
-        signupToggleBtn = new JButton("Sign Up");
+    private JPanel buildTabHeader() {
+        JPanel header = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
+        header.setOpaque(false);
 
-        for (JButton b : new JButton[]{loginToggleBtn, signupToggleBtn}) {
-            b.setFocusPainted(false);
-            b.setFont(Theme.FONT_BUTTON.deriveFont(14f));
-            b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        }
+        loginTab = tabButton("Log In", Icons.loginArrow(Theme.MUTED_TEXT));
+        signupTab = tabButton("Sign Up", Icons.userPlus(Theme.MUTED_TEXT));
+        forgotTab = tabButton("Forgot", Icons.lock(Theme.MUTED_TEXT));
 
-        loginToggleBtn.addActionListener(e -> showSection("LOGIN"));
-        signupToggleBtn.addActionListener(e -> showSection("SIGNUP"));
+        loginTab.addActionListener(e -> showSection("LOGIN"));
+        signupTab.addActionListener(e -> showSection("SIGNUP"));
+        forgotTab.addActionListener(e -> showSection("FORGOT"));
 
-        toggle.add(loginToggleBtn);
-        toggle.add(signupToggleBtn);
-        return toggle;
+        header.add(loginTab);
+        header.add(signupTab);
+        header.add(forgotTab);
+        return header;
+    }
+
+    private JButton tabButton(String text, Icon icon) {
+        JButton btn = new JButton(text, icon);
+        btn.setFont(Theme.FONT_BUTTON.deriveFont(13f));
+        btn.setHorizontalTextPosition(SwingConstants.RIGHT);
+        btn.setIconTextGap(6);
+        btn.setFocusPainted(false);
+        btn.setOpaque(true);
+        btn.setBackground(new Color(243, 244, 246));
+        btn.setForeground(Theme.MUTED_TEXT);
+        btn.setPreferredSize(new Dimension(108, 38));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
     }
 
     private void showSection(String section) {
-        boolean loginActive = section.equals("LOGIN");
-        styleToggleButton(loginToggleBtn, loginActive);
-        styleToggleButton(signupToggleBtn, !loginActive);
+        styleTab(loginTab, section.equals("LOGIN"), Icons.loginArrow(section.equals("LOGIN") ? Color.WHITE : Theme.MUTED_TEXT));
+        styleTab(signupTab, section.equals("SIGNUP"), Icons.userPlus(section.equals("SIGNUP") ? Color.WHITE : Theme.MUTED_TEXT));
+        styleTab(forgotTab, section.equals("FORGOT"), Icons.lock(section.equals("FORGOT") ? Color.WHITE : Theme.MUTED_TEXT));
         crossFade.showCard(section);
     }
 
-    private void styleToggleButton(JButton btn, boolean active) {
+    private void styleTab(JButton btn, boolean active, Icon icon) {
+        btn.setIcon(icon);
         if (active) {
+            btn.setBackground(new Color(99, 102, 241));
+            btn.setForeground(Color.WHITE);
             btn.putClientProperty(FlatClientProperties.STYLE,
-                    "arc:16; background:#6366F1; foreground:#FFFFFF; borderWidth:0; focusWidth:0");
+                    "arc:12; background:#6366F1; foreground:#FFFFFF; borderWidth:0; focusWidth:0");
         } else {
+            btn.setBackground(new Color(243, 244, 246));
+            btn.setForeground(new Color(107, 114, 128));
             btn.putClientProperty(FlatClientProperties.STYLE,
-                    "arc:16; background:#F3F4F6; foreground:#6B7280; borderWidth:0; focusWidth:0");
+                    "arc:12; background:#F3F4F6; foreground:#6B7280; borderWidth:0; focusWidth:0");
         }
+        btn.repaint();
     }
 
-    private JPanel loginFormPanel;
-    private JPanel signupFormPanel;
+    // ---------------- LOGIN ----------------
 
     private JPanel buildLoginCard() {
         JPanel form = new JPanel();
-        this.loginFormPanel = form;
+        loginFormPanel = form;
         form.setOpaque(false);
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
 
-        JLabel title = new JLabel("Welcome Back");
-        title.setFont(Theme.FONT_TITLE);
+        JLabel title = new JLabel("Welcome Back!", Icons.wave(new Color(251, 191, 36)), SwingConstants.LEFT);
+        title.setFont(Theme.FONT_TITLE.deriveFont(21f));
         title.setForeground(Theme.PRIMARY_TEXT);
+        title.setIconTextGap(8);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("Log in to continue your prep journey");
+        JLabel subtitle = new JLabel("Log in to continue your placement journey");
         subtitle.setFont(Theme.FONT_SUBTITLE);
         subtitle.setForeground(Theme.MUTED_TEXT);
         subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         loginEmailField = styledField("Email address", Icons.envelope(Theme.MUTED_TEXT));
         loginEmailField.setAlignmentX(Component.CENTER_ALIGNMENT);
+        attachEmailValidation(loginEmailField);
 
         loginPasswordField = styledPasswordField();
         loginPasswordField.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -157,26 +194,20 @@ public class LoginSignupPanel extends JPanel {
         rememberMe.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         JButton forgotPassword = linkButton("Forgot password?");
-        forgotPassword.addActionListener(e -> {
-            Window owner = SwingUtilities.getWindowAncestor(this);
-            ForgotPasswordDialog dialog = new ForgotPasswordDialog(
-                    owner instanceof Frame ? (Frame) owner : null);
-            dialog.setVisible(true);
-        });
+        forgotPassword.addActionListener(e -> showSection("FORGOT"));
         optionsRow.add(rememberMe, BorderLayout.WEST);
         optionsRow.add(forgotPassword, BorderLayout.EAST);
 
         loginSubmitBtn = primaryButton("Log In");
-        JButton submitBtn = loginSubmitBtn;
-        submitBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        submitBtn.addActionListener(e -> handleLogin());
+        loginSubmitBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        loginSubmitBtn.addActionListener(e -> handleLogin());
         loginEmailField.addActionListener(e -> handleLogin());
         loginPasswordField.addActionListener(e -> handleLogin());
 
         form.add(title);
         form.add(Box.createVerticalStrut(6));
         form.add(subtitle);
-        form.add(Box.createVerticalStrut(26));
+        form.add(Box.createVerticalStrut(24));
         form.add(loginEmailField);
         form.add(Box.createVerticalStrut(14));
         form.add(loginPasswordField);
@@ -185,19 +216,25 @@ public class LoginSignupPanel extends JPanel {
         form.add(Box.createVerticalStrut(6));
         form.add(loginErrorLabel);
         form.add(Box.createVerticalStrut(10));
-        form.add(submitBtn);
+        form.add(loginSubmitBtn);
+        form.add(Box.createVerticalStrut(16));
+        form.add(buildOrDivider());
+        form.add(Box.createVerticalStrut(12));
+        form.add(googleButton());
 
         return form;
     }
 
+    // ---------------- SIGNUP ----------------
+
     private JPanel buildSignupCard() {
         JPanel form = new JPanel();
-        this.signupFormPanel = form;
+        signupFormPanel = form;
         form.setOpaque(false);
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
 
         JLabel title = new JLabel("Create Account");
-        title.setFont(Theme.FONT_TITLE);
+        title.setFont(Theme.FONT_TITLE.deriveFont(21f));
         title.setForeground(Theme.PRIMARY_TEXT);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -211,6 +248,7 @@ public class LoginSignupPanel extends JPanel {
 
         signupEmailField = styledField("Email address", Icons.envelope(Theme.MUTED_TEXT));
         signupEmailField.setAlignmentX(Component.CENTER_ALIGNMENT);
+        attachEmailValidation(signupEmailField);
 
         signupPasswordField = styledPasswordField();
         signupPasswordField.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -221,9 +259,8 @@ public class LoginSignupPanel extends JPanel {
         signupErrorLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         signupSubmitBtn = primaryButton("Create Account");
-        JButton submitBtn = signupSubmitBtn;
-        submitBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        submitBtn.addActionListener(e -> handleSignup());
+        signupSubmitBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        signupSubmitBtn.addActionListener(e -> handleSignup());
         signupNameField.addActionListener(e -> handleSignup());
         signupEmailField.addActionListener(e -> handleSignup());
         signupPasswordField.addActionListener(e -> handleSignup());
@@ -236,7 +273,7 @@ public class LoginSignupPanel extends JPanel {
         form.add(title);
         form.add(Box.createVerticalStrut(6));
         form.add(subtitle);
-        form.add(Box.createVerticalStrut(22));
+        form.add(Box.createVerticalStrut(20));
         form.add(signupNameField);
         form.add(Box.createVerticalStrut(12));
         form.add(signupEmailField);
@@ -245,11 +282,281 @@ public class LoginSignupPanel extends JPanel {
         form.add(Box.createVerticalStrut(8));
         form.add(signupErrorLabel);
         form.add(Box.createVerticalStrut(10));
-        form.add(submitBtn);
-        form.add(Box.createVerticalStrut(14));
+        form.add(signupSubmitBtn);
+        form.add(Box.createVerticalStrut(10));
         form.add(terms);
+        form.add(Box.createVerticalStrut(14));
+        form.add(buildOrDivider());
+        form.add(Box.createVerticalStrut(12));
+        form.add(googleButton());
 
         return form;
+    }
+
+    // ---------------- FORGOT PASSWORD (inline) ----------------
+
+    private JPanel buildForgotCard() {
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setOpaque(false);
+
+        forgotStepLayout = new CardLayout();
+        forgotStepContainer = new JPanel(forgotStepLayout);
+        forgotStepContainer.setOpaque(false);
+
+        forgotStepContainer.add(buildForgotEmailStep(), "EMAIL");
+        forgotStepContainer.add(buildForgotResetStep(), "RESET");
+        forgotStepContainer.add(buildForgotDoneStep(), "DONE");
+
+        outer.add(forgotStepContainer, BorderLayout.CENTER);
+        return outer;
+    }
+
+    private JPanel buildForgotEmailStep() {
+        JPanel form = new JPanel();
+        form.setOpaque(false);
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel("Forgot your password?");
+        title.setFont(Theme.FONT_TITLE.deriveFont(19f));
+        title.setForeground(Theme.PRIMARY_TEXT);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitle = new JLabel("Enter your account email to continue");
+        subtitle.setFont(Theme.FONT_SUBTITLE);
+        subtitle.setForeground(Theme.MUTED_TEXT);
+        subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        forgotEmailField = styledField("Email address", Icons.envelope(Theme.MUTED_TEXT));
+        forgotEmailField.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        forgotEmailError = new JLabel(" ");
+        forgotEmailError.setFont(Theme.FONT_LINK);
+        forgotEmailError.setForeground(Theme.ERROR_COLOR);
+        forgotEmailError.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton continueBtn = primaryButton("Continue");
+        continueBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        continueBtn.addActionListener(e -> handleForgotEmailStep());
+
+        form.add(title);
+        form.add(Box.createVerticalStrut(6));
+        form.add(subtitle);
+        form.add(Box.createVerticalStrut(24));
+        form.add(forgotEmailField);
+        form.add(Box.createVerticalStrut(8));
+        form.add(forgotEmailError);
+        form.add(Box.createVerticalStrut(14));
+        form.add(continueBtn);
+
+        return form;
+    }
+
+    private JPanel buildForgotResetStep() {
+        JPanel form = new JPanel();
+        form.setOpaque(false);
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel("Set a new password");
+        title.setFont(Theme.FONT_TITLE.deriveFont(19f));
+        title.setForeground(Theme.PRIMARY_TEXT);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitle = new JLabel("At least 6 characters");
+        subtitle.setFont(Theme.FONT_SUBTITLE);
+        subtitle.setForeground(Theme.MUTED_TEXT);
+        subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        forgotNewPassword = styledPasswordField();
+        forgotNewPassword.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "New password");
+        forgotNewPassword.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        forgotConfirmPassword = styledPasswordField();
+        forgotConfirmPassword.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, "Confirm password");
+        forgotConfirmPassword.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        forgotResetError = new JLabel(" ");
+        forgotResetError.setFont(Theme.FONT_LINK);
+        forgotResetError.setForeground(Theme.ERROR_COLOR);
+        forgotResetError.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton saveBtn = primaryButton("Save New Password");
+        saveBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        saveBtn.addActionListener(e -> handleForgotResetStep());
+
+        form.add(title);
+        form.add(Box.createVerticalStrut(6));
+        form.add(subtitle);
+        form.add(Box.createVerticalStrut(20));
+        form.add(forgotNewPassword);
+        form.add(Box.createVerticalStrut(12));
+        form.add(forgotConfirmPassword);
+        form.add(Box.createVerticalStrut(8));
+        form.add(forgotResetError);
+        form.add(Box.createVerticalStrut(14));
+        form.add(saveBtn);
+
+        return form;
+    }
+
+    private JPanel buildForgotDoneStep() {
+        JPanel form = new JPanel();
+        form.setOpaque(false);
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setBorder(BorderFactory.createEmptyBorder(40, 0, 0, 0));
+
+        JLabel checkmark = new JLabel(Icons.checkCircleFilled(Theme.SUCCESS_COLOR, Color.WHITE));
+        checkmark.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel title = new JLabel("Password updated!");
+        title.setFont(Theme.FONT_TITLE.deriveFont(19f));
+        title.setForeground(Theme.PRIMARY_TEXT);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        title.setBorder(BorderFactory.createEmptyBorder(14, 0, 6, 0));
+
+        JLabel subtitle = new JLabel("You can now log in with your new password");
+        subtitle.setFont(Theme.FONT_SUBTITLE);
+        subtitle.setForeground(Theme.MUTED_TEXT);
+        subtitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton backBtn = primaryButton("Back to Log In");
+        backBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        backBtn.setBorder(BorderFactory.createEmptyBorder(20, 0, 0, 0));
+        backBtn.addActionListener(e -> showSection("LOGIN"));
+
+        form.add(checkmark);
+        form.add(title);
+        form.add(subtitle);
+        form.add(Box.createVerticalStrut(20));
+        form.add(backBtn);
+
+        return form;
+    }
+
+    private void handleForgotEmailStep() {
+        String email = forgotEmailField.getText().trim();
+        if (email.isBlank()) {
+            forgotEmailError.setText("Please enter your email.");
+            return;
+        }
+        AuthResult result = authService.emailExists(email);
+        if (result.success) {
+            forgotVerifiedEmail = email;
+            forgotEmailError.setText(" ");
+            forgotStepLayout.show(forgotStepContainer, "RESET");
+        } else {
+            forgotEmailError.setText(result.message);
+        }
+    }
+
+    private void handleForgotResetStep() {
+        String newPass = new String(forgotNewPassword.getPassword());
+        String confirmPass = new String(forgotConfirmPassword.getPassword());
+
+        if (!newPass.equals(confirmPass)) {
+            forgotResetError.setText("Passwords do not match.");
+            return;
+        }
+        AuthResult result = authService.resetPassword(forgotVerifiedEmail, newPass);
+        if (result.success) {
+            forgotStepLayout.show(forgotStepContainer, "DONE");
+        } else {
+            forgotResetError.setText(result.message);
+        }
+    }
+
+    // ---------------- Shared UI builders ----------------
+
+    private JPanel buildOrDivider() {
+        JPanel row = new JPanel(new BorderLayout(10, 0));
+        row.setOpaque(false);
+        row.setMaximumSize(new Dimension(300, 20));
+        row.setPreferredSize(new Dimension(300, 20));
+        row.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JComponent lineLeft = thinLine();
+        JComponent lineRight = thinLine();
+
+        JLabel text = new JLabel("or continue with", SwingConstants.CENTER);
+        text.setFont(Theme.FONT_LINK.deriveFont(11f));
+        text.setForeground(Theme.MUTED_TEXT);
+
+        row.add(lineLeft, BorderLayout.WEST);
+        row.add(text, BorderLayout.CENTER);
+        row.add(lineRight, BorderLayout.EAST);
+        return row;
+    }
+
+    /** A line that always paints as a thin horizontal stroke centered in whatever height it's given. */
+    private JComponent thinLine() {
+        JPanel line = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                g.setColor(Theme.FIELD_BORDER);
+                int midY = getHeight() / 2;
+                g.drawLine(0, midY, getWidth(), midY);
+            }
+        };
+        line.setOpaque(false);
+        line.setPreferredSize(new Dimension(90, 20));
+        return line;
+    }
+
+    private JButton googleButton() {
+        JButton btn = new JButton("Continue with Google", Icons.googleG());
+        btn.setFont(Theme.FONT_BUTTON.deriveFont(13f));
+        btn.setIconTextGap(10);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(300, 44));
+        btn.setPreferredSize(new Dimension(300, 44));
+        btn.putClientProperty(FlatClientProperties.STYLE,
+                "arc:14; background:#FFFFFF; foreground:#374151; borderColor:#D1D5DB; borderWidth:1; focusWidth:0");
+        btn.addActionListener(e -> handleGoogleSignIn(btn));
+        return btn;
+    }
+
+    private void handleGoogleSignIn(JButton btn) {
+        String originalText = btn.getText();
+        btn.setText("Waiting for browser...");
+        btn.setEnabled(false);
+
+        GoogleAuthService googleAuth = new GoogleAuthService();
+        googleAuth.signIn()
+                .thenAccept(googleUser -> SwingUtilities.invokeLater(() -> {
+                    btn.setText(originalText);
+                    btn.setEnabled(true);
+                    AuthResult result = authService.loginOrCreateGoogleUser(googleUser.email, googleUser.name);
+                    if (result.success && onAuthSuccess != null) {
+                        onAuthSuccess.onSuccess(result.userId, result.fullName);
+                    } else if (!result.success) {
+                        JOptionPane.showMessageDialog(this, "Google sign-in failed: " + result.message);
+                    }
+                }))
+                .exceptionally(ex -> {
+                    SwingUtilities.invokeLater(() -> {
+                        btn.setText(originalText);
+                        btn.setEnabled(true);
+                        JOptionPane.showMessageDialog(this, ex.getCause() != null
+                                ? ex.getCause().getMessage() : ex.getMessage());
+                    });
+                    return null;
+                });
+    }
+
+    private void attachEmailValidation(JTextField field) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { check(); }
+            public void removeUpdate(DocumentEvent e) { check(); }
+            public void changedUpdate(DocumentEvent e) { check(); }
+
+            private void check() {
+                String text = field.getText();
+                boolean looksValid = text.contains("@") && text.indexOf('@') < text.lastIndexOf('.')
+                        && text.lastIndexOf('.') < text.length() - 1;
+                field.putClientProperty(FlatClientProperties.TEXT_FIELD_TRAILING_ICON,
+                        looksValid ? Icons.checkCircleFilled(Theme.SUCCESS_COLOR, Color.WHITE) : null);
+            }
+        });
     }
 
     private JTextField styledField(String placeholder, Icon leadingIcon) {
@@ -257,7 +564,7 @@ public class LoginSignupPanel extends JPanel {
         field.putClientProperty(FlatClientProperties.PLACEHOLDER_TEXT, placeholder);
         field.putClientProperty(FlatClientProperties.TEXT_FIELD_LEADING_ICON, leadingIcon);
         field.putClientProperty(FlatClientProperties.STYLE,
-                "arc:14; showClearButton:true; iconTextGap:8; margin:10,10,10,10");
+                "arc:14; iconTextGap:8; margin:10,10,10,10");
         field.setFont(Theme.FONT_FIELD);
         field.setMaximumSize(new Dimension(300, 46));
         field.setPreferredSize(new Dimension(300, 46));
@@ -300,8 +607,8 @@ public class LoginSignupPanel extends JPanel {
         return btn;
     }
 
-    private JButton loginSubmitBtn;
-    private JButton signupSubmitBtn;
+    // ---------------- Auth handlers ----------------
+
     private Timer loginSpinnerTimer;
     private Timer signupSpinnerTimer;
 

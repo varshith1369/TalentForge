@@ -146,6 +146,17 @@ public class AuthService {
         }
     }
 
+    /** Logs in a user by email if they exist, otherwise creates an account for them (used by Google Sign-In). */
+    public AuthResult loginOrCreateGoogleUser(String email, String fullName) {
+        AuthResult existing = emailExists(email);
+        if (existing.success) {
+            return existing;
+        }
+        // No local password needed for Google users; store a random unusable hash.
+        String randomPassword = java.util.UUID.randomUUID().toString();
+        return signup(fullName, email, randomPassword);
+    }
+
     private String generateSalt() {
         SecureRandom random = new SecureRandom();
         byte[] salt = new byte[16];

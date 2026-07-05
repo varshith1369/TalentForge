@@ -86,6 +86,258 @@ public class Icons {
         public int getIconHeight() { return 16; }
     }
 
+    public static Icon chart(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawPolyline(new int[]{x, x + 5, x + 10, x + 16}, new int[]{y + 12, y + 7, y + 9, y + 2}, 4);
+                g2.fillOval(x - 1, y + 10, 4, 4);
+                g2.fillOval(x + 4, y + 5, 4, 4);
+                g2.fillOval(x + 9, y + 7, 4, 4);
+                g2.fillOval(x + 15, y, 4, 4);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 20; }
+            public int getIconHeight() { return 18; }
+        };
+    }
+
+    public static Icon code(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawPolyline(new int[]{x + 6, x + 1, x + 6}, new int[]{y + 2, y + 8, y + 14}, 3);
+                g2.drawPolyline(new int[]{x + 12, x + 17, x + 12}, new int[]{y + 2, y + 8, y + 14}, 3);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon document(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(x + 1, y, 11, 15, 3, 3);
+                g2.drawLine(x + 4, y + 4, x + 9, y + 4);
+                g2.drawLine(x + 4, y + 7, x + 9, y + 7);
+                g2.drawOval(x + 8, y + 9, 6, 6);
+                g2.drawLine(x + 13, y + 14, x + 16, y + 17);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 18; }
+        };
+    }
+
+    public static Icon video(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(x, y + 2, 12, 10, 3, 3);
+                int[] xs = {x + 13, x + 18, x + 18, x + 13};
+                int[] ys = {y + 5, y + 2, y + 12, y + 9};
+                g2.drawPolyline(xs, ys, 4);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 20; }
+            public int getIconHeight() { return 14; }
+        };
+    }
+
+    public static Icon chevronRight(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawPolyline(new int[]{x, x + 5, x}, new int[]{y, y + 5, y + 10}, 3);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 10; }
+            public int getIconHeight() { return 10; }
+        };
+    }
+
+    public static Icon googleG() {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int d = 16;
+                g2.setStroke(new BasicStroke(3f));
+                g2.setColor(new Color(66, 133, 244));
+                g2.drawArc(x, y, d, d, -10, 100);
+                g2.setColor(new Color(52, 168, 83));
+                g2.drawArc(x, y, d, d, 90, 90);
+                g2.setColor(new Color(251, 188, 5));
+                g2.drawArc(x, y, d, d, 180, 80);
+                g2.setColor(new Color(234, 67, 53));
+                g2.drawArc(x, y, d, d, 260, 90);
+                g2.setColor(new Color(66, 133, 244));
+                g2.fillRect(x + 8, y + 6, 8, 4);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon checkSimple(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawPolyline(new int[]{x, x + 4, x + 11}, new int[]{y + 5, y + 9, y}, 3);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 14; }
+            public int getIconHeight() { return 12; }
+        };
+    }
+
+    public static Icon checkCircleFilled(Color bg, Color check) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(bg);
+                g2.fillOval(x, y, 18, 18);
+                g2.setColor(check);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawPolyline(new int[]{x + 4, x + 8, x + 14}, new int[]{y + 9, y + 13, y + 5}, 3);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 18; }
+        };
+    }
+
+    public static Icon trophy(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(x + 4, y, 10, 9, 3, 3);
+                g2.drawArc(x, y, 6, 8, -90, 180);
+                g2.drawArc(x + 12, y, 6, 8, 90, 180);
+                g2.drawLine(x + 9, y + 9, x + 9, y + 13);
+                g2.drawLine(x + 5, y + 15, x + 13, y + 15);
+                g2.drawLine(x + 6, y + 13, x + 12, y + 13);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon building(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRect(x + 2, y, 12, 16);
+                g2.fillRect(x + 5, y + 3, 2, 2);
+                g2.fillRect(x + 9, y + 3, 2, 2);
+                g2.fillRect(x + 5, y + 7, 2, 2);
+                g2.fillRect(x + 9, y + 7, 2, 2);
+                g2.fillRect(x + 5, y + 11, 2, 2);
+                g2.fillRect(x + 9, y + 11, 2, 2);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 16; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon peopleGroup(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawOval(x + 4, y, 6, 6);
+                g2.drawArc(x, y + 6, 14, 10, 0, 180);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 16; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon userPlus(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f));
+                g2.drawOval(x + 2, y, 6, 6);
+                g2.drawArc(x - 1, y + 6, 14, 10, 0, 180);
+                g2.drawLine(x + 13, y + 2, x + 13, y + 8);
+                g2.drawLine(x + 10, y + 5, x + 16, y + 5);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon wave(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawArc(x + 2, y, 14, 14, 20, 180);
+                g2.drawLine(x + 9, y + 7, x + 9, y + 15);
+                g2.drawLine(x + 6, y + 15, x + 15, y + 15);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 20; }
+            public int getIconHeight() { return 18; }
+        };
+    }
+
+    public static Icon loginArrow(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(x, y, 9, 14, 2, 2);
+                g2.drawLine(x + 9, y + 7, x + 17, y + 7);
+                g2.drawPolyline(new int[]{x + 13, x + 17, x + 13}, new int[]{y + 3, y + 7, y + 11}, 3);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 14; }
+        };
+    }
+
     public static Icon eye(Color color, boolean open) {
         return new Icon() {
             public void paintIcon(Component c, Graphics g, int x, int y) {

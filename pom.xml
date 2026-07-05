@@ -42,6 +42,55 @@
                     <mainClass>AuthTestApp</mainClass>
                 </configuration>
             </plugin>
+            <!-- Wrap the shaded JAR into a Windows .exe (launcher) -->
+            <plugin>
+                <groupId>net.sf.launch4j</groupId>
+                <artifactId>launch4j-maven-plugin</artifactId>
+                <version>1.7.25</version>
+                <executions>
+                    <execution>
+                        <id>l4j</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>launch4j</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <outfile>${project.build.directory}/${project.artifactId}.exe</outfile>
+                    <jar>${project.build.directory}/${project.build.finalName}-shaded.jar</jar>
+                    <dontWrapJar>false</dontWrapJar>
+                    <headerType>gui</headerType>
+                    <jreMinVersion>17</jreMinVersion>
+                    <classPath>
+                        <mainClass>AuthTestApp</mainClass>
+                    </classPath>
+                </configuration>
+            </plugin>
+            <!-- Create a runnable fat (shaded) JAR with dependencies -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>shaded</shadedClassifierName>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>AuthTestApp</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
