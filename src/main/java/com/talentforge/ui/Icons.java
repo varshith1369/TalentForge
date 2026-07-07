@@ -173,6 +173,119 @@ public class Icons {
         };
     }
 
+    public static Icon dashboardGrid(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.fillRoundRect(x, y, 7, 7, 2, 2);
+                g2.fillRoundRect(x + 9, y, 7, 7, 2, 2);
+                g2.fillRoundRect(x, y + 9, 7, 7, 2, 2);
+                g2.fillRoundRect(x + 9, y + 9, 7, 7, 2, 2);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 16; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon gear(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f));
+                g2.drawOval(x + 4, y + 4, 8, 8);
+                g2.fillOval(x + 7, y + 7, 2, 2);
+                for (int i = 0; i < 8; i++) {
+                    double angle = Math.toRadians(i * 45);
+                    int cx = x + 8, cy = y + 8;
+                    int x1 = (int) (cx + Math.cos(angle) * 6);
+                    int y1 = (int) (cy + Math.sin(angle) * 6);
+                    int x2 = (int) (cx + Math.cos(angle) * 8);
+                    int y2 = (int) (cy + Math.sin(angle) * 8);
+                    g2.drawLine(x1, y1, x2, y2);
+                }
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 18; }
+        };
+    }
+
+    public static Icon calendar(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f));
+                g2.drawRoundRect(x, y + 2, 16, 13, 3, 3);
+                g2.drawLine(x, y + 6, x + 16, y + 6);
+                g2.drawLine(x + 4, y, x + 4, y + 4);
+                g2.drawLine(x + 12, y, x + 12, y + 4);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 16; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon brain(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f));
+                g2.drawArc(x, y, 9, 14, 90, 180);
+                g2.drawArc(x + 7, y, 9, 14, -90, 180);
+                g2.drawLine(x + 8, y + 2, x + 8, y + 12);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 16; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
+    public static Icon logout(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(x, y, 9, 14, 2, 2);
+                g2.drawLine(x + 6, y + 7, x + 16, y + 7);
+                g2.drawPolyline(new int[]{x + 12, x + 16, x + 12}, new int[]{y + 3, y + 7, y + 11}, 3);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 18; }
+            public int getIconHeight() { return 14; }
+        };
+    }
+
+    public static Icon bell(Color color) {
+        return new Icon() {
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f));
+                g2.drawArc(x + 2, y, 12, 12, 0, 180);
+                g2.drawLine(x + 2, y + 6, x + 2, y + 10);
+                g2.drawLine(x + 14, y + 6, x + 14, y + 10);
+                g2.drawLine(x, y + 10, x + 16, y + 10);
+                g2.drawArc(x + 6, y + 10, 4, 4, 180, 180);
+                g2.dispose();
+            }
+            public int getIconWidth() { return 16; }
+            public int getIconHeight() { return 16; }
+        };
+    }
+
     public static Icon googleG() {
         return new Icon() {
             public void paintIcon(Component c, Graphics g, int x, int y) {
