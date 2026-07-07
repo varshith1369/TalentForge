@@ -12,11 +12,17 @@ public class ElevatedCard extends JPanel {
 
     private static final int SHADOW_SIZE = 8;
     private static final int ARC = 14;
+    private Color accentColor = null;
 
     public ElevatedCard(LayoutManager layout) {
         super(layout);
         setOpaque(false);
         setBorder(BorderFactory.createEmptyBorder(SHADOW_SIZE, SHADOW_SIZE, SHADOW_SIZE, SHADOW_SIZE));
+    }
+
+    public void setAccentColor(Color color) {
+        this.accentColor = color;
+        repaint();
     }
 
     @Override
@@ -37,6 +43,16 @@ public class ElevatedCard extends JPanel {
 
         g2.setColor(Theme.PANEL_BG);
         g2.fillRoundRect(x, y, w, h, ARC, ARC);
+
+        if (accentColor != null) {
+            g2.setColor(accentColor);
+            // Draw a rounded accent bar on the left edge
+            Shape oldClip = g2.getClip();
+            g2.clip(new java.awt.geom.RoundRectangle2D.Double(x, y, w, h, ARC, ARC));
+            g2.fillRect(x, y, 6, h);
+            g2.setClip(oldClip);
+        }
+
         g2.dispose();
 
         super.paintComponent(g);
