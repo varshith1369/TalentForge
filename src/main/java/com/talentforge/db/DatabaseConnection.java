@@ -4,6 +4,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Handles the single shared connection to the SQLite database.
@@ -11,11 +14,24 @@ import java.sql.Statement;
  */
 public class DatabaseConnection {
 
-    private static final String DB_PATH = "jdbc:sqlite:talentforge.db";
+    private static final String DB_PATH = "jdbc:sqlite:" + resolveDatabasePath();
     private static Connection connection;
 
     // Prevent instantiation
     private DatabaseConnection() {}
+
+    private static String resolveDatabasePath() {
+        try {
+            String appData = System.getenv("APPDATA");
+            Path dataDir = appData == null || appData.isBlank()
+                    ? Paths.get(System.getProperty("user.home"), ".talentforge")
+                    : Paths.get(appData, "TalentForge");
+            Files.createDirectories(dataDir);
+            return dataDir.resolve("talentforge.db").toString();
+        } catch (Exception e) {
+            return "talentforge.db";
+        }
+    }
 
     public static Connection getConnection() {
         try {
