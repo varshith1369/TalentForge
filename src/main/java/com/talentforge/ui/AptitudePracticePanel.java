@@ -175,8 +175,12 @@ public class AptitudePracticePanel extends JPanel {
     private int currentStreak = 0;
     private int bestStreak = 0;
     private int previousBestScore = 0;
+    private int selectedQuestionCount = 10;
+    private int selectedTimePerQuestion = TIME_PER_QUESTION;
+    private String selectedDifficultyFocus = "Mixed";
     private boolean answerRevealed = false;
     private boolean bestScoreImproved = false;
+    private boolean timerEnabled = true;
     private javax.swing.Timer timer;
     private final Map<String, int[]> categoryStats = new HashMap<>();
 
@@ -193,6 +197,8 @@ public class AptitudePracticePanel extends JPanel {
     private JLabel questionLabel;
     private JProgressBar timerBar, sessionProgress;
     private ButtonGroup categoryGroup, modeGroup, optionGroup;
+    private JSlider questionCountSlider;
+    private JComboBox<String> timerPaceCombo, difficultyFocusCombo;
     private OptionButton[] optionButtons;
     private JButton primaryActionBtn;
 
@@ -315,7 +321,7 @@ public class AptitudePracticePanel extends JPanel {
         title.setFont(new Font("Segoe UI", Font.BOLD, 24));
         title.setForeground(Color.WHITE);
 
-        JLabel sub = new JLabel("Pick a section, choose a delivery mode, then answer against a 30-second clock.");
+        JLabel sub = new JLabel("Pick a section, tune the session, then answer with speed and accuracy.");
         sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         sub.setForeground(new Color(255, 255, 255, 220));
 
@@ -334,8 +340,8 @@ public class AptitudePracticePanel extends JPanel {
         stats.setOpaque(false);
         stats.setPreferredSize(new Dimension(360, 0));
         stats.add(heroStat("Best", UserProfileCache.getAptitudeScore() + "%"));
-        stats.add(heroStat("Timer", TIME_PER_QUESTION + "s"));
-        stats.add(heroStat("Session", "10 Qs"));
+        stats.add(heroStat("Timer", timerLabel()));
+        stats.add(heroStat("Session", selectedQuestionCount + " Qs"));
 
         hero.add(copy, BorderLayout.CENTER);
         hero.add(stats, BorderLayout.EAST);
@@ -381,15 +387,94 @@ public class AptitudePracticePanel extends JPanel {
         modes.add(modeTile("Sequential", "Queue", "Questions are delivered in shuffled FIFO order.", Mode.SEQUENTIAL, PURPLE));
         modes.add(modeTile("Adaptive", "PriorityQueue", "Correct answers bias harder questions; wrong answers bias easier ones.", Mode.ADAPTIVE, VIOLET));
 
-        JPanel tips = new JPanel(new GridLayout(2, 1, 0, 10));
+        JPanel tips = new JPanel(new GridLayout(4, 1, 0, 10));
         tips.setOpaque(false);
+        tips.add(buildQuestionCountControl());
+        tips.add(buildTimerControl());
+        tips.add(buildDifficultyFocusControl());
         tips.add(infoCard("Scoring", "Your final percent is saved only when it beats your current best.", GREEN));
-        tips.add(infoCard("Timer", "When time runs out, the answer is revealed and counted as missed.", ORANGE));
 
         panel.add(header, BorderLayout.NORTH);
         panel.add(modes, BorderLayout.CENTER);
         panel.add(tips, BorderLayout.SOUTH);
         return panel;
+    }
+
+    private JPanel buildQuestionCountControl() {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(12, 0));
+        card.setAccent(BLUE);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+
+        JLabel label = new JLabel("Questions: " + selectedQuestionCount);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(Theme.PRIMARY_TEXT);
+
+        questionCountSlider = new JSlider(5, 20, selectedQuestionCount);
+        questionCountSlider.setOpaque(false);
+        questionCountSlider.setMajorTickSpacing(5);
+        questionCountSlider.setPaintTicks(true);
+        questionCountSlider.addChangeListener(e -> {
+            selectedQuestionCount = questionCountSlider.getValue();
+            label.setText("Questions: " + selectedQuestionCount);
+            updateSelectedSummary();
+        });
+
+        card.add(label, BorderLayout.WEST);
+        card.add(questionCountSlider, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel buildTimerControl() {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(12, 0));
+        card.setAccent(ORANGE);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+
+        JLabel label = new JLabel("Timer pace");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(Theme.PRIMARY_TEXT);
+
+        timerPaceCombo = new JComboBox<>(new String[]{"15 sec", "30 sec", "45 sec", "60 sec", "Untimed"});
+        timerPaceCombo.setSelectedItem(timerEnabled ? selectedTimePerQuestion + " sec" : "Untimed");
+        timerPaceCombo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        timerPaceCombo.addActionListener(e -> {
+            Object selected = timerPaceCombo.getSelectedItem();
+            if (selected == null) return;
+            String value = selected.toString();
+            timerEnabled = !"Untimed".equals(value);
+            if (timerEnabled) {
+                selectedTimePerQuestion = Integer.parseInt(value.substring(0, value.indexOf(' ')));
+            }
+            updateSelectedSummary();
+        });
+
+        card.add(label, BorderLayout.WEST);
+        card.add(timerPaceCombo, BorderLayout.EAST);
+        return card;
+    }
+
+    private JPanel buildDifficultyFocusControl() {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(12, 0));
+        card.setAccent(PINK);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+
+        JLabel label = new JLabel("Difficulty focus");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(Theme.PRIMARY_TEXT);
+
+        difficultyFocusCombo = new JComboBox<>(new String[]{"Mixed", "Easy", "Medium", "Hard"});
+        difficultyFocusCombo.setSelectedItem(selectedDifficultyFocus);
+        difficultyFocusCombo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        difficultyFocusCombo.addActionListener(e -> {
+            Object selected = difficultyFocusCombo.getSelectedItem();
+            if (selected != null) {
+                selectedDifficultyFocus = selected.toString();
+                updateSelectedSummary();
+            }
+        });
+
+        card.add(label, BorderLayout.WEST);
+        card.add(difficultyFocusCombo, BorderLayout.EAST);
+        return card;
     }
 
     private JPanel buildStartBand() {
@@ -510,15 +595,15 @@ public class AptitudePracticePanel extends JPanel {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         right.setOpaque(false);
         qScoreLabel = makePillLabel("Score 0/0", GREEN, false);
-        qTimerLabel = makePillLabel("30s", ORANGE, false);
+        qTimerLabel = makePillLabel(timerLabel(), ORANGE, false);
         right.add(qScoreLabel);
         right.add(qTimerLabel);
 
         header.add(left, BorderLayout.CENTER);
         header.add(right, BorderLayout.EAST);
 
-        timerBar = new JProgressBar(0, TIME_PER_QUESTION);
-        timerBar.setValue(TIME_PER_QUESTION);
+        timerBar = new JProgressBar(0, Math.max(1, selectedTimePerQuestion));
+        timerBar.setValue(Math.max(1, selectedTimePerQuestion));
         timerBar.setBorderPainted(false);
         timerBar.setForeground(PURPLE);
         timerBar.setBackground(Theme.isDark() ? new Color(45, 45, 60) : new Color(229, 231, 235));
@@ -595,12 +680,15 @@ public class AptitudePracticePanel extends JPanel {
 
         java.util.List<Question> pool = new ArrayList<>();
         for (Question q : QUESTION_BANK) {
-            if ("All".equals(selectedCategory) || q.category.equals(selectedCategory)) {
+            boolean categoryMatches = "All".equals(selectedCategory) || q.category.equals(selectedCategory);
+            boolean difficultyMatches = "Mixed".equals(selectedDifficultyFocus)
+                || diffLabel(q.difficulty).equals(selectedDifficultyFocus);
+            if (categoryMatches && difficultyMatches) {
                 pool.add(q);
             }
         }
         Collections.shuffle(pool);
-        totalInSession = Math.min(pool.size(), 10);
+        totalInSession = Math.min(pool.size(), selectedQuestionCount);
 
         questionQueue.clear();
         adaptiveQueue.clear();
@@ -614,7 +702,7 @@ public class AptitudePracticePanel extends JPanel {
         }
 
         if (totalInSession == 0) {
-            JOptionPane.showMessageDialog(this, "No questions in that category yet.", "Empty Category", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "No questions match that category and difficulty focus yet.", "Empty Session", JOptionPane.WARNING_MESSAGE);
             state = SessionState.HOME;
             return;
         }
@@ -735,7 +823,7 @@ public class AptitudePracticePanel extends JPanel {
         if (bestScoreImproved) {
             UserProfileCache.setAptitudeScore(pct);
             int userId = UserProfileCache.getCurrentUserId();
-            if (userId != -1) {
+            if (userId > 0) {
                 StatsService.saveAptitudeScore(userId, pct);
             }
             refreshTopStats();
@@ -842,8 +930,17 @@ public class AptitudePracticePanel extends JPanel {
     /* ============================================================ */
     private void resetTimer() {
         stopTimer();
-        timeLeft = TIME_PER_QUESTION;
-        timerBar.setMaximum(TIME_PER_QUESTION);
+        if (!timerEnabled) {
+            timeLeft = 0;
+            timerBar.setMaximum(1);
+            timerBar.setValue(1);
+            timerBar.setForeground(GREEN);
+            qTimerLabel.setText("Untimed");
+            return;
+        }
+
+        timeLeft = selectedTimePerQuestion;
+        timerBar.setMaximum(selectedTimePerQuestion);
         timerBar.setValue(timeLeft);
         timerBar.setForeground(PURPLE);
         qTimerLabel.setText(timeLeft + "s");
@@ -1090,20 +1187,31 @@ public class AptitudePracticePanel extends JPanel {
     /*  DATA HELPERS                                               */
     /* ============================================================ */
     private int countQuestions(String category) {
-        if ("All".equals(category)) return QUESTION_BANK.length;
+        return countQuestions(category, "Mixed");
+    }
+
+    private int countQuestions(String category, String difficultyFocus) {
         int count = 0;
         for (Question q : QUESTION_BANK) {
-            if (q.category.equals(category)) count++;
+            boolean categoryMatches = "All".equals(category) || q.category.equals(category);
+            boolean difficultyMatches = "Mixed".equals(difficultyFocus) || diffLabel(q.difficulty).equals(difficultyFocus);
+            if (categoryMatches && difficultyMatches) count++;
         }
         return count;
     }
 
     private void updateSelectedSummary() {
         if (selectedSummaryLabel != null) {
+            int available = countQuestions(selectedCategory, selectedDifficultyFocus);
             selectedSummaryLabel.setText(selectedCategory + " / "
+                + selectedDifficultyFocus + " / "
                 + (currentMode == Mode.SEQUENTIAL ? "Sequential Queue" : "Adaptive PriorityQueue")
-                + " / " + Math.min(countQuestions(selectedCategory), 10) + " questions");
+                + " / " + Math.min(available, selectedQuestionCount) + " questions / " + timerLabel());
         }
+    }
+
+    private String timerLabel() {
+        return timerEnabled ? selectedTimePerQuestion + "s" : "Untimed";
     }
 
     private String diffLabel(int difficulty) {

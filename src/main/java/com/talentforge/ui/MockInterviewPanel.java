@@ -138,7 +138,10 @@ public class MockInterviewPanel extends JPanel {
     private SessionState state = SessionState.HOME;
     private InterviewQuestion currentQuestion;
     private String selectedCategory = "All";
+    private String selectedInterviewMode = "Classic";
+    private String selectedAnswerGoal = "Balanced";
     private int selectedRating = 0;
+    private boolean showSampleAnswers = true;
     private JPanel resultPanel;
 
     /* ============================================================ */
@@ -155,6 +158,7 @@ public class MockInterviewPanel extends JPanel {
     private JLabel answeredLabel;
     private JLabel avgRatingLabel;
     private JLabel qualityLabel;
+    private JLabel wordCountLabel;
     private JLabel questionLabel;
     private JLabel hintPreviewLabel;
     private JLabel samplePreviewLabel;
@@ -163,6 +167,9 @@ public class MockInterviewPanel extends JPanel {
     private JButton nextBtn;
     private JButton[] ratingButtons = new JButton[5];
     private JSlider questionCountSlider;
+    private JComboBox<String> interviewModeCombo;
+    private JComboBox<String> answerGoalCombo;
+    private JCheckBox sampleAnswerCheck;
 
     public MockInterviewPanel() {
         setLayout(new BorderLayout());
@@ -339,8 +346,11 @@ public class MockInterviewPanel extends JPanel {
             updateSelectedSummary();
         });
 
-        JPanel cardsWrap = new JPanel(new GridLayout(2, 1, 0, 12));
+        JPanel cardsWrap = new JPanel(new GridLayout(5, 1, 0, 12));
         cardsWrap.setOpaque(false);
+        cardsWrap.add(buildInterviewModeControl());
+        cardsWrap.add(buildAnswerGoalControl());
+        cardsWrap.add(buildSampleVisibilityControl());
         cardsWrap.add(infoCard("Answer shape", "Start clear, add one concrete example, and finish with the result or lesson.", TEAL));
         cardsWrap.add(infoCard("Self review", "Use the rating to judge clarity, confidence, and relevance, not perfection.", ORANGE));
 
@@ -353,6 +363,83 @@ public class MockInterviewPanel extends JPanel {
         panel.add(header, BorderLayout.NORTH);
         panel.add(body, BorderLayout.CENTER);
         return panel;
+    }
+
+    private JPanel buildInterviewModeControl() {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(12, 0));
+        card.setAccent(INDIGO);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+
+        JLabel label = new JLabel("Interview mode");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(Theme.PRIMARY_TEXT);
+
+        interviewModeCombo = new JComboBox<>(new String[]{"Classic", "Rapid Fire", "STAR Drill", "Technical Deep Dive"});
+        interviewModeCombo.setSelectedItem(selectedInterviewMode);
+        interviewModeCombo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        interviewModeCombo.addActionListener(e -> {
+            Object selected = interviewModeCombo.getSelectedItem();
+            if (selected != null) {
+                selectedInterviewMode = selected.toString();
+                applyModeDefaults();
+                updateSelectedSummary();
+            }
+        });
+
+        card.add(label, BorderLayout.WEST);
+        card.add(interviewModeCombo, BorderLayout.EAST);
+        return card;
+    }
+
+    private JPanel buildAnswerGoalControl() {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(12, 0));
+        card.setAccent(TEAL);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+
+        JLabel label = new JLabel("Answer goal");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(Theme.PRIMARY_TEXT);
+
+        answerGoalCombo = new JComboBox<>(new String[]{"Concise", "Balanced", "Detailed"});
+        answerGoalCombo.setSelectedItem(selectedAnswerGoal);
+        answerGoalCombo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        answerGoalCombo.addActionListener(e -> {
+            Object selected = answerGoalCombo.getSelectedItem();
+            if (selected != null) {
+                selectedAnswerGoal = selected.toString();
+                updateSelectedSummary();
+            }
+        });
+
+        card.add(label, BorderLayout.WEST);
+        card.add(answerGoalCombo, BorderLayout.EAST);
+        return card;
+    }
+
+    private JPanel buildSampleVisibilityControl() {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(12, 0));
+        card.setAccent(ORANGE);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+
+        JLabel label = new JLabel("Show sample answer");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(Theme.PRIMARY_TEXT);
+
+        sampleAnswerCheck = new JCheckBox();
+        sampleAnswerCheck.setSelected(showSampleAnswers);
+        sampleAnswerCheck.setOpaque(false);
+        sampleAnswerCheck.setToolTipText("Toggle sample answer guidance during the session.");
+        sampleAnswerCheck.addActionListener(e -> {
+            showSampleAnswers = sampleAnswerCheck.isSelected();
+            if (currentQuestion != null && samplePreviewLabel != null) {
+                updateSamplePreview();
+            }
+            updateSelectedSummary();
+        });
+
+        card.add(label, BorderLayout.WEST);
+        card.add(sampleAnswerCheck, BorderLayout.EAST);
+        return card;
     }
 
     private JPanel buildStartBand() {
@@ -384,6 +471,39 @@ public class MockInterviewPanel extends JPanel {
         grid.add(btn);
     }
 
+    private void applyModeDefaults() {
+        if (questionCountSlider == null) return;
+
+        switch (selectedInterviewMode) {
+            case "Rapid Fire" -> {
+                questionCountSlider.setValue(Math.min(questionCountSlider.getMaximum(), 3));
+                selectedAnswerGoal = "Concise";
+                showSampleAnswers = false;
+            }
+            case "STAR Drill" -> {
+                questionCountSlider.setValue(Math.min(questionCountSlider.getMaximum(), 5));
+                selectedAnswerGoal = "Balanced";
+                showSampleAnswers = true;
+            }
+            case "Technical Deep Dive" -> {
+                questionCountSlider.setValue(Math.min(questionCountSlider.getMaximum(), 6));
+                selectedAnswerGoal = "Detailed";
+                showSampleAnswers = true;
+            }
+            default -> {
+                selectedAnswerGoal = "Balanced";
+                showSampleAnswers = true;
+            }
+        }
+
+        if (answerGoalCombo != null) {
+            answerGoalCombo.setSelectedItem(selectedAnswerGoal);
+        }
+        if (sampleAnswerCheck != null) {
+            sampleAnswerCheck.setSelected(showSampleAnswers);
+        }
+    }
+
     /* ============================================================ */
     /*  PLAY PANEL                                                 */
     /* ============================================================ */
@@ -402,20 +522,22 @@ public class MockInterviewPanel extends JPanel {
         rail.setPreferredSize(new Dimension(270, 0));
         rail.setBorder(new EmptyBorder(18, 16, 18, 16));
 
-        JPanel stats = new JPanel(new GridLayout(4, 1, 0, 10));
+        JPanel stats = new JPanel(new GridLayout(5, 1, 0, 10));
         stats.setOpaque(false);
 
         progressLabel = new JLabel();
         answeredLabel = new JLabel();
         avgRatingLabel = new JLabel();
         qualityLabel = new JLabel();
+        wordCountLabel = new JLabel();
 
         stats.add(statRow("Progress", progressLabel, INDIGO));
         stats.add(statRow("Answered", answeredLabel, TEAL));
         stats.add(statRow("Avg Rating", avgRatingLabel, ORANGE));
+        stats.add(statRow("Words", wordCountLabel, SLATE));
         stats.add(statRow("Answer Quality", qualityLabel, GREEN));
 
-        JTextArea coach = new JTextArea("Use STAR for behavioral answers, define terms simply for technical ones, and avoid rambling.");
+        JTextArea coach = new JTextArea("Use the selected mode as your lens. A strong answer is specific, structured, and easy to follow.");
         coach.setEditable(false);
         coach.setLineWrap(true);
         coach.setWrapStyleWord(true);
@@ -509,12 +631,15 @@ public class MockInterviewPanel extends JPanel {
             leftRate.add(ratingButtons[i]);
         }
 
+        JButton outlineBtn = createOutlineButton("Insert Outline", TEAL);
+        outlineBtn.addActionListener(e -> insertAnswerOutline());
         prevBtn = createOutlineButton("Previous", SLATE);
         prevBtn.addActionListener(e -> previousQuestion());
         nextBtn = createGradientButton("Next Prompt", 150, 40);
         nextBtn.addActionListener(e -> nextQuestion());
         JPanel nav = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         nav.setOpaque(false);
+        nav.add(outlineBtn);
         nav.add(prevBtn);
         nav.add(nextBtn);
 
@@ -590,13 +715,21 @@ public class MockInterviewPanel extends JPanel {
             + escapeHtml(currentQuestion.question) + "</body></html>");
         answerArea.setText(currentQuestion.userAnswer);
         hintPreviewLabel.setText(htmlText(currentQuestion.hint, 220));
-        samplePreviewLabel.setText(htmlText(currentQuestion.sampleAnswer, 220));
+        updateSamplePreview();
 
         updateRatingButtons();
         prevBtn.setEnabled(!historyStack.isEmpty());
         nextBtn.setText(sessionQueue.size() == 1 ? "Finish Session" : "Next Prompt");
         syncSessionStats();
         onAnswerChanged();
+    }
+
+    private void updateSamplePreview() {
+        if (samplePreviewLabel == null || currentQuestion == null) return;
+        String text = showSampleAnswers
+            ? currentQuestion.sampleAnswer
+            : "Sample answer hidden for a more realistic interview round. Turn it back on from Session Design.";
+        samplePreviewLabel.setText(htmlText(text, 220));
     }
 
     private void nextQuestion() {
@@ -638,6 +771,27 @@ public class MockInterviewPanel extends JPanel {
         currentQuestion.rating = selectedRating;
     }
 
+    private void insertAnswerOutline() {
+        if (answerArea == null || currentQuestion == null) return;
+
+        String existing = answerArea.getText().trim();
+        String outline;
+        if ("Behavioral".equals(currentQuestion.category) || "STAR Drill".equals(selectedInterviewMode)) {
+            outline = "Situation: \nTask: \nAction: \nResult: \nLearning: ";
+        } else if ("Technical".equals(currentQuestion.category) || "Technical Deep Dive".equals(selectedInterviewMode)) {
+            outline = "Definition: \nKey idea: \nExample: \nTradeoff: \nConclusion: ";
+        } else {
+            outline = "Opening: \nExample: \nImpact: \nClose: ";
+        }
+
+        if (existing.isEmpty()) {
+            answerArea.setText(outline);
+        } else {
+            answerArea.append("\n\n" + outline);
+        }
+        answerArea.requestFocusInWindow();
+    }
+
     private void endSession() {
         captureCurrentInput();
 
@@ -651,7 +805,7 @@ public class MockInterviewPanel extends JPanel {
         int sessions = UserProfileCache.getMockInterviews() + 1;
         UserProfileCache.setMockInterviews(sessions);
         int userId = UserProfileCache.getCurrentUserId();
-        if (userId != -1) {
+        if (userId > 0) {
             StatsService.saveMockInterviews(userId, sessions);
         }
         refreshSessionCount();
@@ -690,7 +844,7 @@ public class MockInterviewPanel extends JPanel {
         JLabel title = new JLabel("Interview Session Complete");
         title.setFont(new Font("Segoe UI", Font.BOLD, 25));
         title.setForeground(Color.WHITE);
-        JLabel sub = new JLabel("Average self-rating " + formatRating(avgRating) + " / 5 across " + ratedCount() + " rated responses.");
+        JLabel sub = new JLabel(selectedInterviewMode + " complete. Average self-rating " + formatRating(avgRating) + " / 5 across " + ratedCount() + " rated responses.");
         sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         sub.setForeground(new Color(255, 255, 255, 220));
         copy.add(title);
@@ -702,7 +856,7 @@ public class MockInterviewPanel extends JPanel {
         stats.setPreferredSize(new Dimension(360, 0));
         stats.add(heroStat("Answered", String.valueOf(answeredCount())));
         stats.add(heroStat("Avg Rating", formatRating(avgRating)));
-        stats.add(heroStat("Sessions", String.valueOf(UserProfileCache.getMockInterviews())));
+        stats.add(heroStat("Goal", selectedAnswerGoal));
 
         summary.add(copy, BorderLayout.CENTER);
         summary.add(stats, BorderLayout.EAST);
@@ -750,7 +904,7 @@ public class MockInterviewPanel extends JPanel {
         stats.setOpaque(false);
         stats.add(statRow("Answered", new JLabel(answeredCount() + "/" + sessionOrder.size()), INDIGO));
         stats.add(statRow("Rated", new JLabel(String.valueOf(ratedCount())), ORANGE));
-        stats.add(statRow("Longest Answer", new JLabel(longestAnswerLength() + " chars"), TEAL));
+        stats.add(statRow("Longest Answer", new JLabel(longestAnswerWords() + " words"), TEAL));
         stats.add(statRow("Top Track", new JLabel(strongestCategory()), GREEN));
 
         JPanel tips = new JPanel(new GridLayout(2, 1, 0, 12));
@@ -855,10 +1009,12 @@ public class MockInterviewPanel extends JPanel {
     private void syncSessionStats() {
         int answered = answeredCount();
         int total = sessionOrder.size();
+        String answer = answerArea != null ? answerArea.getText().trim() : "";
         progressLabel.setText(answered + " / " + total);
         answeredLabel.setText(String.valueOf(answered));
         avgRatingLabel.setText(ratedCount() == 0 ? "-" : formatRating(averageRating()));
-        qualityLabel.setText(answerQualityLabel(answerArea != null ? answerArea.getText().trim() : ""));
+        wordCountLabel.setText(String.valueOf(wordCount(answer)));
+        qualityLabel.setText(answerQualityLabel(answer));
     }
 
     private int answeredCount() {
@@ -925,13 +1081,35 @@ public class MockInterviewPanel extends JPanel {
         return longest;
     }
 
+    private int longestAnswerWords() {
+        int longest = 0;
+        for (InterviewQuestion q : sessionOrder) {
+            longest = Math.max(longest, wordCount(q.userAnswer));
+        }
+        return longest;
+    }
+
     private String answerQualityLabel(String answer) {
-        int length = answer.length();
-        if (length == 0) return "Empty";
-        if (length < 60) return "Too short";
-        if (length < 180) return "Decent start";
-        if (length < 320) return "Strong detail";
-        return "Very detailed";
+        int words = wordCount(answer);
+        if (words == 0) return "Empty";
+
+        int[] range = targetWordRange();
+        if (words < range[0]) return "Needs more detail";
+        if (words <= range[1]) return "On target";
+        return "Trim it down";
+    }
+
+    private int wordCount(String answer) {
+        if (answer == null || answer.isBlank()) return 0;
+        return answer.trim().split("\\s+").length;
+    }
+
+    private int[] targetWordRange() {
+        return switch (selectedAnswerGoal) {
+            case "Concise" -> new int[]{45, 90};
+            case "Detailed" -> new int[]{140, 260};
+            default -> new int[]{80, 160};
+        };
     }
 
     private String formatRating(double rating) {
@@ -968,7 +1146,10 @@ public class MockInterviewPanel extends JPanel {
 
     private String summaryText() {
         int desired = questionCountSlider == null ? 5 : questionCountSlider.getValue();
-        return selectedCategory + " / " + Math.min(desired, countQuestions(selectedCategory)) + " prompts / session review enabled";
+        int[] range = targetWordRange();
+        return selectedCategory + " / " + selectedInterviewMode + " / "
+            + Math.min(desired, countQuestions(selectedCategory)) + " prompts / "
+            + selectedAnswerGoal + " " + range[0] + "-" + range[1] + " words";
     }
 
     private int countQuestions(String category) {

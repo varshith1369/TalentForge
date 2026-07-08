@@ -5,6 +5,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import javax.imageio.ImageIO;
 
 /**
  * Handles user profile data persistence in the database.
@@ -134,6 +138,55 @@ public class ProfileService {
 
         } catch (SQLException e) {
             System.err.println("Failed to save profile: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Load stored profile image, if one exists. */
+    public static BufferedImage loadProfileImage(int userId) {
+        String sql = "SELECT profile_image FROM user_profiles WHERE user_id = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    byte[] imageBytes = rs.getBytes("profile_image");
+                    if (imageBytes != null && imageBytes.length > 0) {
+                        return ImageIO.read(new ByteArrayInputStream(imageBytes));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to load profile image: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /** Save or replace the user's profile image. */
+    public static boolean saveProfileImage(int userId, BufferedImage image) {
+        if (image == null) {
+            return false;
+        }
+
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", out);
+            byte[] imageBytes = out.toByteArray();
+
+            String sql = "INSERT INTO user_profiles (user_id, profile_image) VALUES (?, ?) "
+                    + "ON CONFLICT(user_id) DO UPDATE SET profile_image = excluded.profile_image, "
+                    + "updated_at = CURRENT_TIMESTAMP";
+
+            try (Connection conn = DatabaseConnection.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, userId);
+                ps.setBytes(2, imageBytes);
+                ps.executeUpdate();
+                return true;
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to save profile image: " + e.getMessage());
             return false;
         }
     }
