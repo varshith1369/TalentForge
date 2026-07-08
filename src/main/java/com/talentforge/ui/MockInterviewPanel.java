@@ -4,153 +4,173 @@ import com.talentforge.db.StatsService;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Stack;
 
 /**
  * Mock Interview module.
  *
  * <h3>Data Structures (project requirement)</h3>
  * <ul>
- *   <li><b>Stack&lt;InterviewQuestion&gt;</b> — navigation history. Each answered
- *       question is pushed onto the stack; "Previous" pops it to review answers.</li>
- *   <li><b>LinkedList&lt;InterviewQuestion&gt;</b> — ordered question queue for the
+ *   <li><b>Stack&lt;InterviewQuestion&gt;</b> - navigation history. Each answered
+ *       question is pushed onto the stack; Previous pops it to review answers.</li>
+ *   <li><b>LinkedList&lt;InterviewQuestion&gt;</b> - ordered question queue for the
  *       current session, navigated front-to-back.</li>
  * </ul>
  */
 public class MockInterviewPanel extends JPanel {
 
     /* ============================================================ */
-    /*  QUESTION MODEL                                              */
+    /*  QUESTION MODEL                                             */
     /* ============================================================ */
     private static class InterviewQuestion {
-        final String category, question, hint, sampleAnswer;
+        final String category;
+        final String question;
+        final String hint;
+        final String sampleAnswer;
         String userAnswer = "";
-        int rating = 0; // 1–5 stars
+        int rating = 0;
+        boolean completed = false;
 
         InterviewQuestion(String category, String question, String hint, String sampleAnswer) {
-            this.category = category; this.question = question;
-            this.hint = hint; this.sampleAnswer = sampleAnswer;
+            this.category = category;
+            this.question = question;
+            this.hint = hint;
+            this.sampleAnswer = sampleAnswer;
         }
     }
 
+    private enum SessionState { HOME, PLAYING, RESULT }
+
+    private static final Color INDIGO = new Color(59, 130, 246);
+    private static final Color TEAL = new Color(20, 184, 166);
+    private static final Color GREEN = new Color(34, 197, 94);
+    private static final Color ORANGE = new Color(245, 158, 11);
+    private static final Color ROSE = new Color(244, 63, 94);
+    private static final Color SLATE = new Color(100, 116, 139);
+
     /* ============================================================ */
-    /*  BUILT-IN QUESTION BANK                                      */
+    /*  BUILT-IN QUESTION BANK                                     */
     /* ============================================================ */
     private static final InterviewQuestion[] ALL_QUESTIONS = {
-        // ---- HR ----
-        new InterviewQuestion("HR","Tell me about yourself.",
-            "Structure: Present → Past → Future. Keep it under 2 minutes.",
-            "I am a final-year CSE student passionate about software development. I have worked on projects involving Java, SQL, and web technologies. I am looking to join a company where I can contribute to impactful products while continuing to grow."),
-        new InterviewQuestion("HR","What are your greatest strengths?",
-            "Pick 2–3 strengths and support each with a brief example.",
-            "My greatest strengths are problem-solving, attention to detail, and adaptability. For instance, I refactored a legacy module during my internship, reducing processing time by 30%."),
-        new InterviewQuestion("HR","Where do you see yourself in 5 years?",
-            "Align your goals with the company's growth. Show ambition but be realistic.",
-            "In 5 years, I see myself as a senior engineer leading a small team, having shipped multiple products. I plan to deepen my expertise in system design and distributed systems."),
-        new InterviewQuestion("HR","Why do you want to work for this company?",
-            "Research the company's mission, products, and culture beforehand.",
-            "I admire your company's commitment to building developer-first tools. The engineering blog entries on distributed caching deeply resonated with my interests."),
-        new InterviewQuestion("HR","Describe a challenge you overcame.",
-            "Use the STAR method: Situation → Task → Action → Result.",
-            "During a hackathon, our team lost a key member midway. I redistributed tasks, built the backend myself, and we delivered the product on time, winning 2nd place."),
-        new InterviewQuestion("HR","What is your biggest weakness?",
-            "Be honest, then explain how you are actively working on it.",
-            "I sometimes overthink edge cases, which can slow early development. I've been practising time-boxing design decisions to stay productive."),
-        new InterviewQuestion("HR","Do you prefer working alone or in a team?",
-            "Both have merits — demonstrate flexibility.",
-            "I enjoy both. I like the autonomy of independent work for deep-focus tasks, and I thrive in team settings for brainstorming and code review cycles."),
-        // ---- Technical ----
-        new InterviewQuestion("Technical","Explain the difference between a process and a thread.",
-            "Focus on memory space, creation overhead, and communication.",
-            "A process is an independent program instance with its own memory space. A thread is a lightweight unit of execution within a process, sharing memory. Threads communicate via shared memory; processes communicate via IPC mechanisms."),
-        new InterviewQuestion("Technical","What is polymorphism? Give an example.",
-            "Mention compile-time (overloading) vs run-time (overriding) polymorphism.",
-            "Polymorphism allows objects of different classes to be treated through a common interface. Run-time polymorphism: a Shape reference can point to a Circle or Rectangle, and calling draw() invokes the correct method based on the actual object."),
-        new InterviewQuestion("Technical","What is the time complexity of binary search?",
-            "Think about how the search space halves each step.",
-            "O(log n) — because each comparison halves the search space. Space complexity is O(1) for iterative, O(log n) for recursive."),
-        new InterviewQuestion("Technical","Explain ACID properties in databases.",
-            "Atomicity, Consistency, Isolation, Durability — give an example for each.",
-            "ACID ensures reliable transactions. Atomicity: all operations succeed or none do. Consistency: data stays valid. Isolation: concurrent transactions don't interfere. Durability: committed data persists even after crashes."),
-        new InterviewQuestion("Technical","What is a deadlock and how do you prevent it?",
-            "Think: mutual exclusion, hold-and-wait, no preemption, circular wait.",
-            "Deadlock occurs when two processes each hold a resource the other needs. Prevention strategies: impose ordering on locks, use timeouts, or use lock hierarchies to break circular waits."),
-        new InterviewQuestion("Technical","Explain REST vs SOAP.",
-            "Focus on protocol, flexibility, and use cases.",
-            "REST uses HTTP methods (GET, POST, PUT, DELETE) with JSON; it is lightweight and stateless. SOAP is a protocol with strict XML messaging, built-in security (WS-Security), and ACID compliance — suited for enterprise banking systems."),
-        new InterviewQuestion("Technical","What is the difference between HashMap and HashTable?",
-            "Key differences: synchronization, null keys, and performance.",
-            "HashMap is non-synchronized (faster) and allows one null key and multiple null values. HashTable is synchronized (thread-safe) and does not allow null keys or values."),
-        new InterviewQuestion("Technical","What is a microservices architecture?",
-            "Contrast with monolith; mention communication (REST/gRPC), deployment, scalability.",
-            "Microservices decompose an application into small, independently deployable services each responsible for a single business domain. They communicate via REST or message queues and can be scaled individually. Trade-offs include network latency and operational complexity."),
-        // ---- Behavioral ----
-        new InterviewQuestion("Behavioral","Tell me about a time you worked in a team under pressure.",
-            "Use STAR: focus on your specific contribution.",
-            "During our final-year project, we had a 48-hour deadline extension after requirements changed. I coordinated the task split, built the authentication module, and tested integration overnight. We delivered on time."),
-        new InterviewQuestion("Behavioral","Describe a situation where you had to learn something quickly.",
-            "Show adaptability and a structured approach to learning.",
-            "I was assigned to fix a bug in a React codebase on my first week at an internship. I used the official docs, YouTube tutorials, and pair-programmed with a senior. I fixed the bug and learned state management in 2 days."),
-        new InterviewQuestion("Behavioral","How do you handle disagreements with teammates?",
-            "Emphasize listening, empathy, and data-driven resolution.",
-            "I start by listening fully to their perspective. I then present my reasoning with data or prototypes. If we still disagree, I escalate to the team lead for a tie-breaking decision based on project goals."),
-        new InterviewQuestion("Behavioral","Give an example of when you went above and beyond.",
-            "Show initiative and ownership.",
-            "I noticed our CI/CD pipeline took 20 minutes for builds. Without being asked, I researched Docker layer caching and reduced build time to 6 minutes, which the whole team appreciated."),
-        new InterviewQuestion("Behavioral","How do you prioritize tasks when everything is urgent?",
-            "Mention frameworks like Eisenhower matrix or impact-vs-effort.",
-            "I list all tasks, estimate impact and effort, then use the Eisenhower matrix. High-impact, low-effort tasks get done first. I communicate timelines clearly if I have to push lower-priority items."),
+        new InterviewQuestion("HR", "Tell me about yourself.",
+            "Use a Present -> Past -> Future structure. Keep it under two minutes and relevant to the role.",
+            "I am a final-year CSE student focused on backend and product engineering. Over the last year I have built Java and SQL projects, worked on team deliverables, and improved how I explain technical decisions. I am now looking for a role where I can contribute to real product work and keep growing as an engineer."),
+        new InterviewQuestion("HR", "What are your greatest strengths?",
+            "Pick two or three strengths and back each one with a small example.",
+            "My strongest qualities are problem solving, ownership, and calm communication. For example, during a project deadline I reorganized our task split, handled a blocked backend task myself, and kept the team aligned so we still shipped on time."),
+        new InterviewQuestion("HR", "Where do you see yourself in five years?",
+            "Connect your goals to learning, responsibility, and impact rather than titles alone.",
+            "In five years I want to be a strong engineer trusted with system design and mentoring newer teammates. I hope to have built depth in scalable backend systems and to be contributing to product decisions, not just implementation."),
+        new InterviewQuestion("HR", "Why do you want to work for this company?",
+            "Reference the company's product, engineering culture, or mission. Avoid generic praise.",
+            "I am interested in this company because your products solve practical problems at scale and the engineering culture seems thoughtful. I like teams that care about quality, learning, and customer impact, and that aligns with how I want to grow."),
+        new InterviewQuestion("HR", "Describe a challenge you overcame.",
+            "Use STAR: Situation, Task, Action, Result.",
+            "During a hackathon our frontend developer had to leave midway. I took over the integration work, simplified the scope, and coordinated testing with the rest of the team. We finished the core product and placed second."),
+        new InterviewQuestion("HR", "What is your biggest weakness?",
+            "Be honest, then show how you are actively improving it.",
+            "I can spend too long polishing early details before the main structure is solid. I have been improving that by time-boxing drafts first, then refining after I know the core direction is right."),
+
+        new InterviewQuestion("Technical", "Explain the difference between a process and a thread.",
+            "Talk about memory isolation, cost of creation, and communication.",
+            "A process is an independent program instance with its own memory space, while a thread is a lightweight execution unit inside a process that shares memory with sibling threads. Threads are cheaper to create, but they require more careful synchronization because they share state."),
+        new InterviewQuestion("Technical", "What is polymorphism? Give an example.",
+            "Mention both overloading and overriding, but focus on runtime behavior if you give one example.",
+            "Polymorphism means a common interface can support different concrete behaviors. For example, a Shape reference can point to a Circle or Rectangle, and calling draw on that reference runs the correct implementation for the actual object."),
+        new InterviewQuestion("Technical", "What is the time complexity of binary search?",
+            "Explain why the search space halves every step.",
+            "Binary search runs in O(log n) time because every comparison removes half of the remaining search space. The iterative version uses O(1) extra space, while a recursive version uses call-stack space."),
+        new InterviewQuestion("Technical", "Explain ACID properties in databases.",
+            "Define Atomicity, Consistency, Isolation, and Durability with one crisp example or sentence each.",
+            "Atomicity means a transaction fully succeeds or fully fails. Consistency means valid data stays valid after the transaction. Isolation means concurrent transactions do not corrupt one another. Durability means once a transaction commits, the change persists even after a crash."),
+        new InterviewQuestion("Technical", "What is a deadlock and how do you prevent it?",
+            "Mention circular wait and practical prevention strategies.",
+            "A deadlock happens when multiple threads or processes each wait for resources held by the others, so none can continue. Prevention techniques include consistent lock ordering, timeouts, reducing shared state, and avoiding circular wait conditions."),
+        new InterviewQuestion("Technical", "Explain REST vs SOAP.",
+            "Contrast protocol style, message format, flexibility, and common use cases.",
+            "REST is an architectural style usually built on HTTP with lightweight payloads such as JSON. SOAP is a stricter protocol with XML messaging and formal standards. REST is simpler and more flexible for web APIs, while SOAP is often used where strong contract rules and enterprise standards matter."),
+        new InterviewQuestion("Technical", "What is the difference between HashMap and Hashtable?",
+            "Cover synchronization, null handling, and practical usage.",
+            "HashMap is not synchronized and allows one null key and multiple null values, so it is generally faster in single-threaded use. Hashtable is synchronized and does not allow null keys or values, but in modern Java other concurrent map options are usually preferred."),
+        new InterviewQuestion("Technical", "What is microservices architecture?",
+            "Compare it with a monolith and mention both benefits and tradeoffs.",
+            "Microservices architecture splits an application into small independently deployable services, each focused on a business capability. This helps independent scaling and deployment, but it adds operational complexity, network communication overhead, and more distributed debugging."),
+
+        new InterviewQuestion("Behavioral", "Tell me about a time you worked in a team under pressure.",
+            "Use STAR and emphasize your personal contribution, not just the team outcome.",
+            "In a final-year project we had a compressed deadline after requirements changed late. I reorganized the remaining work, handled the authentication flow myself, and set short check-ins so blockers were cleared quickly. We delivered on time and the demo was stable."),
+        new InterviewQuestion("Behavioral", "Describe a situation where you had to learn something quickly.",
+            "Show how you learn under pressure and how you validated your understanding.",
+            "I once had to debug a React codebase during my first week in an internship. I used official docs, traced the component tree, and paired briefly with a teammate to confirm my understanding. I fixed the issue in two days and documented the root cause for the team."),
+        new InterviewQuestion("Behavioral", "How do you handle disagreements with teammates?",
+            "Show listening, clarity, and a bias toward shared goals instead of winning the argument.",
+            "I first make sure I understand the other person's reasoning completely. Then I share my view with examples or data, and we compare against the project goal. If needed, I suggest a small experiment or ask for a tie-break from the lead so we can move forward constructively."),
+        new InterviewQuestion("Behavioral", "Give an example of when you went above and beyond.",
+            "Show initiative that made the team better, not just extra hours.",
+            "I noticed our build pipeline was much slower than it needed to be, so I researched the bottleneck, adjusted caching in the CI setup, and cut build time significantly. That change helped the whole team iterate faster every day."),
+        new InterviewQuestion("Behavioral", "How do you prioritize tasks when everything feels urgent?",
+            "Talk about impact, deadlines, dependencies, and communication.",
+            "I list the tasks, clarify deadlines and blockers, then rank them by impact and dependency. I finish the work that unblocks others or affects delivery first, and I communicate tradeoffs early so expectations stay realistic.")
     };
 
     /* ============================================================ */
-    /*  DATA STRUCTURES                                             */
+    /*  DATA STRUCTURES                                            */
     /* ============================================================ */
-    /** LinkedList — ordered question sequence for the current session */
-    private LinkedList<InterviewQuestion> sessionQueue = new LinkedList<>();
-
-    /** Stack — history of answered questions (for Previous/review) */
+    private final LinkedList<InterviewQuestion> sessionQueue = new LinkedList<>();
     private final Stack<InterviewQuestion> historyStack = new Stack<>();
+    private final List<InterviewQuestion> sessionOrder = new ArrayList<>();
 
     /* ============================================================ */
-    /*  SESSION STATE                                               */
+    /*  SESSION STATE                                              */
     /* ============================================================ */
-    private enum SessionState { HOME, PLAYING, REVIEWING, RESULT }
     private SessionState state = SessionState.HOME;
-
     private InterviewQuestion currentQuestion;
     private String selectedCategory = "All";
-    private int sessionTotal = 0;
-    private int ratingSum = 0;
-    private int ratingCount = 0;
-
-    // UI
-    private final JPanel mainCards;
-    private final CardLayout cards = new CardLayout();
-    private JLabel qCountLabel, qCategoryBadge;
-    private JTextArea answerArea;
-    private JLabel questionLabel;
-    private JPanel starsPanel;
-    private JButton[] starBtns = new JButton[5];
     private int selectedRating = 0;
-    private JButton prevBtn, nextBtn, hintBtn;
-    private JPanel homePanel, playPanel;
+    private JPanel resultPanel;
+
+    /* ============================================================ */
+    /*  UI                                                         */
+    /* ============================================================ */
+    private final CardLayout cards = new CardLayout();
+    private final JPanel mainCards = new JPanel(cards);
+
+    private JLabel sessionsLabel;
+    private JLabel selectedSummaryLabel;
+    private JLabel qCountLabel;
+    private JLabel qCategoryBadge;
+    private JLabel progressLabel;
+    private JLabel answeredLabel;
+    private JLabel avgRatingLabel;
+    private JLabel qualityLabel;
+    private JLabel questionLabel;
+    private JLabel hintPreviewLabel;
+    private JLabel samplePreviewLabel;
+    private JTextArea answerArea;
+    private JButton prevBtn;
+    private JButton nextBtn;
+    private JButton[] ratingButtons = new JButton[5];
+    private JSlider questionCountSlider;
 
     public MockInterviewPanel() {
         setLayout(new BorderLayout());
         setBackground(Theme.PAGE_BG);
 
-        mainCards = new JPanel(cards);
         mainCards.setOpaque(false);
-
-        homePanel = buildHomePanel();
-        playPanel = buildPlayPanel();
-
-        mainCards.add(homePanel, "home");
-        mainCards.add(playPanel, "play");
+        mainCards.add(buildHomePanel(), "home");
+        mainCards.add(buildPlayPanel(), "play");
 
         add(buildTopBar(), BorderLayout.NORTH);
         add(mainCards, BorderLayout.CENTER);
@@ -160,296 +180,385 @@ public class MockInterviewPanel extends JPanel {
     }
 
     /* ============================================================ */
-    /*  TOP BAR                                                     */
+    /*  TOP BAR                                                    */
     /* ============================================================ */
     private JPanel buildTopBar() {
-        JPanel bar = new JPanel(new BorderLayout());
-        bar.setBackground(Theme.PANEL_BG);
+        JPanel bar = new JPanel(new BorderLayout(18, 0)) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(Theme.PANEL_BG);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setPaint(new GradientPaint(0, 0,
+                    new Color(INDIGO.getRed(), INDIGO.getGreen(), INDIGO.getBlue(), Theme.isDark() ? 68 : 36),
+                    getWidth(), 0,
+                    new Color(TEAL.getRed(), TEAL.getGreen(), TEAL.getBlue(), Theme.isDark() ? 40 : 22)));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        bar.setOpaque(false);
         bar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0,0,1,0,Theme.FIELD_BORDER),
-            new EmptyBorder(12,20,12,20)));
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.FIELD_BORDER),
+            new EmptyBorder(16, 22, 16, 22)));
 
-        JLabel icon = new JLabel("🎤  Mock Interview");
-        icon.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        icon.setForeground(Theme.PRIMARY_TEXT);
-
-        JLabel sub = new JLabel("HR · Technical · Behavioral — Practice your interview responses");
+        JPanel left = new JPanel(new GridLayout(2, 1, 0, 2));
+        left.setOpaque(false);
+        JLabel title = new JLabel("Mock Interview Studio");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        title.setForeground(Theme.PRIMARY_TEXT);
+        JLabel sub = new JLabel("HR, technical, and behavioral practice with guided reflection and cleaner review.");
         sub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         sub.setForeground(Theme.MUTED_TEXT);
+        left.add(title);
+        left.add(sub);
 
-        JPanel left = new JPanel(new BorderLayout());
-        left.setOpaque(false);
-        left.add(icon, BorderLayout.CENTER);
-        left.add(sub, BorderLayout.SOUTH);
-
-        JLabel sessions = new JLabel("Sessions: " + UserProfileCache.getMockInterviews());
-        sessions.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        sessions.setForeground(new Color(99, 102, 241));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        right.setOpaque(false);
+        right.add(makePillLabel(ALL_QUESTIONS.length + " Prompts", TEAL, false));
+        sessionsLabel = makePillLabel("Sessions " + UserProfileCache.getMockInterviews(), INDIGO, false);
+        right.add(sessionsLabel);
 
         bar.add(left, BorderLayout.CENTER);
-        bar.add(sessions, BorderLayout.EAST);
+        bar.add(right, BorderLayout.EAST);
         return bar;
     }
 
     /* ============================================================ */
-    /*  HOME PANEL                                                  */
+    /*  HOME PANEL                                                 */
     /* ============================================================ */
     private JPanel buildHomePanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setOpaque(false);
+        JPanel root = new JPanel(new BorderLayout(0, 18));
+        root.setOpaque(false);
+        root.setBorder(new EmptyBorder(22, 24, 24, 24));
 
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBackground(Theme.PANEL_BG);
-        card.setBorder(new EmptyBorder(32, 48, 32, 48));
+        root.add(buildHeroPanel(), BorderLayout.NORTH);
 
-        JLabel title = new JLabel("🎤 Start Mock Interview");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        title.setForeground(Theme.PRIMARY_TEXT);
-        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JPanel center = new JPanel(new GridBagLayout());
+        center.setOpaque(false);
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.gridy = 0;
+        gc.weighty = 1;
+        gc.fill = GridBagConstraints.BOTH;
 
-        JLabel sub = new JLabel("Choose category and answer questions at your own pace");
+        gc.gridx = 0;
+        gc.weightx = 0.56;
+        gc.insets = new Insets(0, 0, 0, 14);
+        center.add(buildCategoryPanel(), gc);
+
+        gc.gridx = 1;
+        gc.weightx = 0.44;
+        gc.insets = new Insets(0, 0, 0, 0);
+        center.add(buildPrepPanel(), gc);
+
+        root.add(center, BorderLayout.CENTER);
+        root.add(buildStartBand(), BorderLayout.SOUTH);
+        return root;
+    }
+
+    private JPanel buildHeroPanel() {
+        GradientCard hero = new GradientCard(new BorderLayout(18, 0), INDIGO, TEAL);
+        hero.setBorder(new EmptyBorder(24, 24, 24, 24));
+        hero.setPreferredSize(new Dimension(0, 140));
+
+        JPanel copy = new JPanel();
+        copy.setOpaque(false);
+        copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel("Practice the answer, not just the question");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 25));
+        title.setForeground(Color.WHITE);
+
+        JLabel sub = new JLabel("Choose a track, set session size, speak your answer into text, rate it, and review your own patterns.");
         sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        sub.setForeground(Theme.MUTED_TEXT);
-        sub.setAlignmentX(Component.CENTER_ALIGNMENT);
-        sub.setBorder(new EmptyBorder(4, 0, 20, 0));
+        sub.setForeground(new Color(255, 255, 255, 220));
 
-        // Category cards
-        JLabel catTitle = new JLabel("Select Category:");
-        catTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        catTitle.setForeground(Theme.PRIMARY_TEXT);
-        catTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
-        catTitle.setBorder(new EmptyBorder(0, 0, 10, 0));
+        selectedSummaryLabel = new JLabel();
+        selectedSummaryLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        selectedSummaryLabel.setForeground(Color.WHITE);
+        updateSelectedSummary();
 
-        JPanel catGrid = new JPanel(new GridLayout(1, 4, 10, 0));
-        catGrid.setOpaque(false);
-        catGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
+        copy.add(title);
+        copy.add(Box.createVerticalStrut(6));
+        copy.add(sub);
+        copy.add(Box.createVerticalStrut(12));
+        copy.add(selectedSummaryLabel);
 
-        String[][] cats = {
-            {"All", "🌐", "#6366F1"},
-            {"HR", "👤", "#34C759"},
-            {"Technical", "💻", "#0A84FF"},
-            {"Behavioral", "🧠", "#FF9F0A"},
-        };
-        ButtonGroup grp = new ButtonGroup();
-        for (String[] cat : cats) {
-            Color c = Color.decode(cat[2]);
-            JToggleButton btn = buildCatCard(cat[0], cat[1], c);
-            if (cat[0].equals("All")) btn.setSelected(true);
-            btn.addItemListener(e -> { if (btn.isSelected()) selectedCategory = cat[0]; });
-            grp.add(btn);
-            catGrid.add(btn);
-        }
+        JPanel stats = new JPanel(new GridLayout(1, 3, 10, 0));
+        stats.setOpaque(false);
+        stats.setPreferredSize(new Dimension(360, 0));
+        stats.add(heroStat("Tracks", "3"));
+        stats.add(heroStat("Prompts", String.valueOf(ALL_QUESTIONS.length)));
+        stats.add(heroStat("Your Sessions", String.valueOf(UserProfileCache.getMockInterviews())));
 
-        // Number of questions
-        JLabel numTitle = new JLabel("Number of questions: 5");
-        numTitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        numTitle.setForeground(Theme.MUTED_TEXT);
-        numTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
-        numTitle.setBorder(new EmptyBorder(16, 0, 4, 0));
+        hero.add(copy, BorderLayout.CENTER);
+        hero.add(stats, BorderLayout.EAST);
+        return hero;
+    }
 
-        JSlider numSlider = new JSlider(3, 10, 5);
-        numSlider.setOpaque(false);
-        numSlider.setAlignmentX(Component.LEFT_ALIGNMENT);
-        numSlider.addChangeListener(e -> numTitle.setText("Number of questions: " + numSlider.getValue()));
+    private JPanel buildCategoryPanel() {
+        SurfacePanel panel = new SurfacePanel(new BorderLayout(0, 14));
+        panel.setBorder(new EmptyBorder(18, 18, 18, 18));
 
-        JButton startBtn = createGradientButton("▶  Start Interview", 200, 44);
-        startBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        startBtn.addActionListener(e -> startSession(numSlider.getValue()));
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+        header.add(sectionLabel("Interview Track"), BorderLayout.WEST);
+        header.add(makeTinyLabel("Choose the style of questions to rehearse."), BorderLayout.EAST);
 
-        // Tips
-        JLabel tip = new JLabel("<html><body style='width:340px;color:#888;font-size:11pt'>" +
-            "💡 Tip: Use the STAR method for behavioral questions: " +
-            "<b>S</b>ituation → <b>T</b>ask → <b>A</b>ction → <b>R</b>esult</body></html>");
-        tip.setAlignmentX(Component.CENTER_ALIGNMENT);
-        tip.setBorder(new EmptyBorder(16, 0, 0, 0));
+        JPanel grid = new JPanel(new GridLayout(1, 4, 12, 0));
+        grid.setOpaque(false);
+        ButtonGroup group = new ButtonGroup();
 
-        card.add(title); card.add(sub);
-        card.add(catTitle); card.add(catGrid);
-        card.add(numTitle); card.add(numSlider);
-        card.add(Box.createVerticalStrut(20)); card.add(startBtn); card.add(tip);
+        addCategoryTile(grid, group, "All", "Mixed set", INDIGO);
+        addCategoryTile(grid, group, "HR", "Motivation and fit", GREEN);
+        addCategoryTile(grid, group, "Technical", "Core engineering", TEAL);
+        addCategoryTile(grid, group, "Behavioral", "STAR storytelling", ORANGE);
 
-        panel.add(card);
+        panel.add(header, BorderLayout.NORTH);
+        panel.add(grid, BorderLayout.CENTER);
         return panel;
     }
 
-    private JToggleButton buildCatCard(String name, String emoji, Color color) {
-        JToggleButton btn = new JToggleButton("<html><center>" + emoji + "<br/>" + name + "</center></html>");
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        btn.setPreferredSize(new Dimension(100, 70));
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addItemListener(e -> {
+    private JPanel buildPrepPanel() {
+        SurfacePanel panel = new SurfacePanel(new BorderLayout(0, 16));
+        panel.setBorder(new EmptyBorder(18, 18, 18, 18));
+
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+        header.add(sectionLabel("Session Design"), BorderLayout.WEST);
+        header.add(makeTinyLabel("Tune the length and prep lens."), BorderLayout.EAST);
+
+        JLabel countLabel = new JLabel("Prompts this session: 5");
+        countLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        countLabel.setForeground(Theme.PRIMARY_TEXT);
+
+        questionCountSlider = new JSlider(3, 10, 5);
+        questionCountSlider.setOpaque(false);
+        questionCountSlider.addChangeListener(e -> {
+            countLabel.setText("Prompts this session: " + questionCountSlider.getValue());
+            updateSelectedSummary();
+        });
+
+        JPanel cardsWrap = new JPanel(new GridLayout(2, 1, 0, 12));
+        cardsWrap.setOpaque(false);
+        cardsWrap.add(infoCard("Answer shape", "Start clear, add one concrete example, and finish with the result or lesson.", TEAL));
+        cardsWrap.add(infoCard("Self review", "Use the rating to judge clarity, confidence, and relevance, not perfection.", ORANGE));
+
+        JPanel body = new JPanel(new BorderLayout(0, 12));
+        body.setOpaque(false);
+        body.add(countLabel, BorderLayout.NORTH);
+        body.add(questionCountSlider, BorderLayout.CENTER);
+        body.add(cardsWrap, BorderLayout.SOUTH);
+
+        panel.add(header, BorderLayout.NORTH);
+        panel.add(body, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel buildStartBand() {
+        SurfacePanel panel = new SurfacePanel(new BorderLayout(14, 0));
+        panel.setBorder(new EmptyBorder(16, 18, 16, 18));
+
+        JLabel copy = new JLabel("Keep answers concise first, then expand with stronger evidence on the second pass.");
+        copy.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        copy.setForeground(Theme.MUTED_TEXT);
+
+        JButton startBtn = createGradientButton("Start Mock Interview", 210, 44);
+        startBtn.addActionListener(e -> startSession(questionCountSlider.getValue()));
+
+        panel.add(copy, BorderLayout.CENTER);
+        panel.add(startBtn, BorderLayout.EAST);
+        return panel;
+    }
+
+    private void addCategoryTile(JPanel grid, ButtonGroup group, String category, String desc, Color accent) {
+        JToggleButton btn = choiceTile(category, desc, accent);
+        btn.addActionListener(e -> {
             if (btn.isSelected()) {
-                btn.setBackground(new Color(color.getRed(),color.getGreen(),color.getBlue(),35));
-                btn.setForeground(color);
-                btn.setBorder(BorderFactory.createLineBorder(color, 2, true));
-            } else {
-                btn.setBackground(Theme.PANEL_BG);
-                btn.setForeground(Theme.MUTED_TEXT);
-                btn.setBorder(BorderFactory.createLineBorder(Theme.FIELD_BORDER, 1, true));
+                selectedCategory = category;
+                updateSelectedSummary();
             }
         });
-        btn.setBackground(Theme.PANEL_BG);
-        btn.setForeground(Theme.MUTED_TEXT);
-        btn.setBorder(BorderFactory.createLineBorder(Theme.FIELD_BORDER, 1, true));
-        return btn;
+        if ("All".equals(category)) btn.setSelected(true);
+        group.add(btn);
+        grid.add(btn);
     }
 
     /* ============================================================ */
-    /*  PLAY PANEL                                                  */
+    /*  PLAY PANEL                                                 */
     /* ============================================================ */
     private JPanel buildPlayPanel() {
-        JPanel panel = new JPanel(new BorderLayout(0, 12));
+        JPanel root = new JPanel(new BorderLayout(16, 0));
+        root.setOpaque(false);
+        root.setBorder(new EmptyBorder(22, 24, 24, 24));
+
+        root.add(buildSessionRail(), BorderLayout.WEST);
+        root.add(buildInterviewWorkspace(), BorderLayout.CENTER);
+        return root;
+    }
+
+    private JPanel buildSessionRail() {
+        SurfacePanel rail = new SurfacePanel(new BorderLayout(0, 14));
+        rail.setPreferredSize(new Dimension(270, 0));
+        rail.setBorder(new EmptyBorder(18, 16, 18, 16));
+
+        JPanel stats = new JPanel(new GridLayout(4, 1, 0, 10));
+        stats.setOpaque(false);
+
+        progressLabel = new JLabel();
+        answeredLabel = new JLabel();
+        avgRatingLabel = new JLabel();
+        qualityLabel = new JLabel();
+
+        stats.add(statRow("Progress", progressLabel, INDIGO));
+        stats.add(statRow("Answered", answeredLabel, TEAL));
+        stats.add(statRow("Avg Rating", avgRatingLabel, ORANGE));
+        stats.add(statRow("Answer Quality", qualityLabel, GREEN));
+
+        JTextArea coach = new JTextArea("Use STAR for behavioral answers, define terms simply for technical ones, and avoid rambling.");
+        coach.setEditable(false);
+        coach.setLineWrap(true);
+        coach.setWrapStyleWord(true);
+        coach.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        coach.setForeground(Theme.MUTED_TEXT);
+        coach.setBackground(Theme.PANEL_BG);
+        coach.setBorder(new EmptyBorder(8, 0, 0, 0));
+
+        rail.add(sectionLabel("Session"), BorderLayout.NORTH);
+        rail.add(stats, BorderLayout.CENTER);
+        rail.add(coach, BorderLayout.SOUTH);
+        return rail;
+    }
+
+    private JPanel buildInterviewWorkspace() {
+        JPanel panel = new JPanel(new BorderLayout(0, 14));
         panel.setOpaque(false);
-        panel.setBorder(new EmptyBorder(20, 32, 20, 32));
 
-        // ---- TOP STATUS BAR ----
-        JPanel statusBar = new JPanel(new BorderLayout());
-        statusBar.setOpaque(false);
+        JPanel header = new JPanel(new BorderLayout(12, 0));
+        header.setOpaque(false);
 
-        qCountLabel = new JLabel("Question 1 of 5");
-        qCountLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        JPanel left = new JPanel();
+        left.setOpaque(false);
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+        qCountLabel = new JLabel("Prompt 1 of 5");
+        qCountLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
         qCountLabel.setForeground(Theme.PRIMARY_TEXT);
+        qCategoryBadge = makePillLabel("HR", INDIGO, true);
+        left.add(qCountLabel);
+        left.add(Box.createVerticalStrut(6));
+        left.add(qCategoryBadge);
 
-        qCategoryBadge = new JLabel("HR");
-        qCategoryBadge.setFont(new Font("Segoe UI", Font.BOLD, 11));
-        qCategoryBadge.setForeground(Color.WHITE);
-        qCategoryBadge.setBackground(new Color(99, 102, 241));
-        qCategoryBadge.setOpaque(true);
-        qCategoryBadge.setBorder(new EmptyBorder(2, 8, 2, 8));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        right.setOpaque(false);
+        JButton homeBtn = createOutlineButton("End Session", ROSE);
+        homeBtn.addActionListener(e -> endSession());
+        right.add(homeBtn);
 
-        statusBar.add(qCountLabel, BorderLayout.CENTER);
-        statusBar.add(qCategoryBadge, BorderLayout.EAST);
+        header.add(left, BorderLayout.CENTER);
+        header.add(right, BorderLayout.EAST);
 
-        // ---- QUESTION CARD ----
-        ElevatedCard qCard = new ElevatedCard(new BorderLayout());
-        JPanel qInner = new JPanel(new BorderLayout(0, 12));
-        qInner.setOpaque(false);
-        qInner.setBorder(new EmptyBorder(20, 22, 20, 22));
+        SurfacePanel promptCard = new SurfacePanel(new BorderLayout(0, 16));
+        promptCard.setBorder(new EmptyBorder(22, 24, 20, 24));
 
         questionLabel = new JLabel();
-        questionLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        questionLabel.setFont(new Font("Segoe UI", Font.BOLD, 17));
         questionLabel.setForeground(Theme.PRIMARY_TEXT);
 
-        // Answer text area
-        answerArea = new JTextArea(6, 40);
+        answerArea = new JTextArea(9, 50);
         answerArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         answerArea.setForeground(Theme.PRIMARY_TEXT);
-        answerArea.setBackground(Theme.isDark() ? new Color(28, 28, 42) : new Color(248, 249, 252));
+        answerArea.setBackground(Theme.isDark() ? new Color(28, 32, 44) : new Color(250, 251, 253));
         answerArea.setLineWrap(true);
         answerArea.setWrapStyleWord(true);
-        answerArea.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Theme.FIELD_BORDER, 1, true),
-            new EmptyBorder(10, 12, 10, 12)));
-        answerArea.putClientProperty("JTextArea.placeholder", "Type your answer here...");
+        answerArea.setBorder(new EmptyBorder(14, 16, 14, 16));
+        answerArea.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { onAnswerChanged(); }
+            public void removeUpdate(DocumentEvent e) { onAnswerChanged(); }
+            public void changedUpdate(DocumentEvent e) {}
+        });
 
         JScrollPane answerScroll = new JScrollPane(answerArea);
-        answerScroll.setBorder(null);
+        answerScroll.setBorder(BorderFactory.createLineBorder(Theme.FIELD_BORDER, 1, true));
 
-        // Hint + Sample answer toggle
-        hintBtn = createOutlineButton("💡 Show Hint", new Color(245, 158, 11));
-        JButton sampleBtn = createOutlineButton("📖 Sample", new Color(14, 165, 233));
+        JPanel rightCards = new JPanel(new GridLayout(2, 1, 0, 12));
+        rightCards.setOpaque(false);
+        hintPreviewLabel = new JLabel();
+        samplePreviewLabel = new JLabel();
+        rightCards.add(contentCard("Coach Hint", hintPreviewLabel, ORANGE));
+        rightCards.add(contentCard("Sample Direction", samplePreviewLabel, TEAL));
+        rightCards.setPreferredSize(new Dimension(280, 0));
 
-        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        actionRow.setOpaque(false);
-        actionRow.add(hintBtn);
-        actionRow.add(sampleBtn);
+        JPanel body = new JPanel(new BorderLayout(14, 0));
+        body.setOpaque(false);
+        body.add(answerScroll, BorderLayout.CENTER);
+        body.add(rightCards, BorderLayout.EAST);
 
-        hintBtn.addActionListener(e -> {
-            if (currentQuestion != null)
-                JOptionPane.showMessageDialog(this, "💡 " + currentQuestion.hint, "Hint", JOptionPane.INFORMATION_MESSAGE);
-        });
-        sampleBtn.addActionListener(e -> {
-            if (currentQuestion != null)
-                JOptionPane.showMessageDialog(this, "<html><body style='width:400px'>" +
-                    "<b>Sample Answer:</b><br/><br/>" + currentQuestion.sampleAnswer + "</body></html>",
-                    "Sample Answer", JOptionPane.INFORMATION_MESSAGE);
-        });
+        JPanel ratingRow = new JPanel(new BorderLayout());
+        ratingRow.setOpaque(false);
 
-        // ---- STAR RATING ----
-        JLabel rateLabel = new JLabel("Rate your answer:");
-        rateLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        rateLabel.setForeground(Theme.MUTED_TEXT);
-
-        starsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        starsPanel.setOpaque(false);
-        starsPanel.add(rateLabel);
-
-        for (int i = 0; i < 5; i++) {
-            final int rating = i + 1;
-            starBtns[i] = new JButton("☆");
-            starBtns[i].setFont(new Font("Segoe UI Emoji", Font.PLAIN, 20));
-            starBtns[i].setForeground(new Color(245, 158, 11));
-            starBtns[i].setContentAreaFilled(false);
-            starBtns[i].setBorderPainted(false);
-            starBtns[i].setFocusPainted(false);
-            starBtns[i].setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            starBtns[i].addActionListener(e -> setRating(rating));
-            starsPanel.add(starBtns[i]);
+        JPanel leftRate = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        leftRate.setOpaque(false);
+        JLabel rateText = new JLabel("Rate this answer");
+        rateText.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        rateText.setForeground(Theme.PRIMARY_TEXT);
+        leftRate.add(rateText);
+        for (int i = 0; i < ratingButtons.length; i++) {
+            int rating = i + 1;
+            ratingButtons[i] = createRatingButton(rating);
+            ratingButtons[i].addActionListener(e -> setRating(rating));
+            leftRate.add(ratingButtons[i]);
         }
 
-        qInner.add(questionLabel, BorderLayout.NORTH);
-        qInner.add(answerScroll, BorderLayout.CENTER);
-        qInner.add(actionRow, BorderLayout.SOUTH);
-
-        qCard.add(qInner, BorderLayout.CENTER);
-        qCard.add(starsPanel, BorderLayout.SOUTH);
-
-        // ---- NAVIGATION ----
-        JPanel navRow = new JPanel(new BorderLayout());
-        navRow.setOpaque(false);
-
-        prevBtn = createOutlineButton("← Previous", Theme.MUTED_TEXT);
+        prevBtn = createOutlineButton("Previous", SLATE);
         prevBtn.addActionListener(e -> previousQuestion());
-
-        nextBtn = createGradientButton("Next →", 130, 38);
+        nextBtn = createGradientButton("Next Prompt", 150, 40);
         nextBtn.addActionListener(e -> nextQuestion());
+        JPanel nav = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        nav.setOpaque(false);
+        nav.add(prevBtn);
+        nav.add(nextBtn);
 
-        JButton endBtn = createOutlineButton("✕ End", new Color(239, 68, 68));
-        endBtn.addActionListener(e -> endSession());
+        ratingRow.add(leftRate, BorderLayout.WEST);
+        ratingRow.add(nav, BorderLayout.EAST);
 
-        JPanel rightNav = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        rightNav.setOpaque(false);
-        rightNav.add(endBtn);
-        rightNav.add(nextBtn);
+        promptCard.add(questionLabel, BorderLayout.NORTH);
+        promptCard.add(body, BorderLayout.CENTER);
+        promptCard.add(ratingRow, BorderLayout.SOUTH);
 
-        navRow.add(prevBtn, BorderLayout.WEST);
-        navRow.add(rightNav, BorderLayout.EAST);
-
-        panel.add(statusBar, BorderLayout.NORTH);
-        panel.add(qCard, BorderLayout.CENTER);
-        panel.add(navRow, BorderLayout.SOUTH);
-
+        panel.add(header, BorderLayout.NORTH);
+        panel.add(promptCard, BorderLayout.CENTER);
         return panel;
     }
 
     /* ============================================================ */
-    /*  SESSION LOGIC                                               */
+    /*  SESSION LOGIC                                              */
     /* ============================================================ */
     private void startSession(int count) {
+        state = SessionState.PLAYING;
         historyStack.clear();
         sessionQueue.clear();
-        ratingSum = 0; ratingCount = 0; selectedRating = 0;
+        sessionOrder.clear();
+        currentQuestion = null;
+        selectedRating = 0;
 
-        // Build session pool from category
         List<InterviewQuestion> pool = new ArrayList<>();
         for (InterviewQuestion q : ALL_QUESTIONS) {
-            if (selectedCategory.equals("All") || q.category.equals(selectedCategory))
-                pool.add(q);
+            if ("All".equals(selectedCategory) || q.category.equals(selectedCategory)) {
+                pool.add(cloneQuestion(q));
+            }
         }
         Collections.shuffle(pool);
 
-        // Fill LinkedList queue
-        sessionTotal = Math.min(count, pool.size());
-        for (int i = 0; i < sessionTotal; i++) {
-            pool.get(i).userAnswer = "";
-            pool.get(i).rating = 0;
-            sessionQueue.add(pool.get(i));
+        int target = Math.min(count, pool.size());
+        for (int i = 0; i < target; i++) {
+            InterviewQuestion q = pool.get(i);
+            sessionQueue.add(q);
+            sessionOrder.add(q);
         }
 
         if (sessionQueue.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No questions in that category!", "Empty", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "No prompts available for that category.", "Empty Category", JOptionPane.WARNING_MESSAGE);
+            state = SessionState.HOME;
             return;
         }
 
@@ -457,49 +566,54 @@ public class MockInterviewPanel extends JPanel {
         loadCurrentQuestion();
     }
 
+    private InterviewQuestion cloneQuestion(InterviewQuestion q) {
+        return new InterviewQuestion(q.category, q.question, q.hint, q.sampleAnswer);
+    }
+
     private void loadCurrentQuestion() {
-        if (sessionQueue.isEmpty()) { endSession(); return; }
+        if (sessionQueue.isEmpty()) {
+            endSession();
+            return;
+        }
 
-        currentQuestion = sessionQueue.peekFirst(); // look at front without removing
-        int answered = historyStack.size();
-        int total = historyStack.size() + sessionQueue.size();
-
-        qCountLabel.setText("Question " + (answered + 1) + " of " + total);
-        qCategoryBadge.setText("  " + currentQuestion.category + "  ");
-
-        Color catColor = switch (currentQuestion.category) {
-            case "HR" -> new Color(34, 197, 94);
-            case "Technical" -> new Color(14, 165, 233);
-            case "Behavioral" -> new Color(245, 158, 11);
-            default -> new Color(99, 102, 241);
-        };
-        qCategoryBadge.setBackground(catColor);
-
-        questionLabel.setText("<html><body style='width:500px'>" + currentQuestion.question + "</body></html>");
-        answerArea.setText(currentQuestion.userAnswer);
-
-        // Restore rating
+        currentQuestion = sessionQueue.peekFirst();
         selectedRating = currentQuestion.rating;
-        updateStars(selectedRating);
 
+        int answered = completedCount();
+        int total = sessionOrder.size();
+
+        qCountLabel.setText("Prompt " + (historyStack.size() + 1) + " of " + total);
+        qCategoryBadge.setText(currentQuestion.category);
+        qCategoryBadge.setBackground(categoryColor(currentQuestion.category));
+
+        questionLabel.setText("<html><body style='width:760px;font-family:Segoe UI;font-size:14pt;line-height:1.35'>"
+            + escapeHtml(currentQuestion.question) + "</body></html>");
+        answerArea.setText(currentQuestion.userAnswer);
+        hintPreviewLabel.setText(htmlText(currentQuestion.hint, 220));
+        samplePreviewLabel.setText(htmlText(currentQuestion.sampleAnswer, 220));
+
+        updateRatingButtons();
         prevBtn.setEnabled(!historyStack.isEmpty());
+        nextBtn.setText(sessionQueue.size() == 1 ? "Finish Session" : "Next Prompt");
+        syncSessionStats();
+        onAnswerChanged();
     }
 
     private void nextQuestion() {
         if (currentQuestion == null) return;
 
-        // Save answer + rating from UI
-        currentQuestion.userAnswer = answerArea.getText().trim();
-        currentQuestion.rating = selectedRating;
+        captureCurrentInput();
 
-        if (selectedRating > 0) {
-            ratingSum += selectedRating;
-            ratingCount++;
+        if (currentQuestion.userAnswer.isBlank()) {
+            int choice = JOptionPane.showConfirmDialog(this,
+                "Move on without writing an answer for this prompt?",
+                "Skip Answer", JOptionPane.YES_NO_OPTION);
+            if (choice != JOptionPane.YES_OPTION) return;
         }
 
-        // Push to history Stack, pop from session Queue (LinkedList)
-        historyStack.push(sessionQueue.pollFirst());
-        selectedRating = 0;
+        currentQuestion.completed = true;
+        InterviewQuestion answered = sessionQueue.pollFirst();
+        historyStack.push(answered);
 
         if (sessionQueue.isEmpty()) {
             endSession();
@@ -511,185 +625,524 @@ public class MockInterviewPanel extends JPanel {
     private void previousQuestion() {
         if (historyStack.isEmpty()) return;
 
-        // Save current progress
-        if (currentQuestion != null) {
-            currentQuestion.userAnswer = answerArea.getText().trim();
-            currentQuestion.rating = selectedRating;
-        }
+        captureCurrentInput();
 
-        // Pop from Stack, push back to front of LinkedList
-        InterviewQuestion prev = historyStack.pop();
-        sessionQueue.addFirst(prev);
-
-        selectedRating = 0;
+        InterviewQuestion previous = historyStack.pop();
+        sessionQueue.addFirst(previous);
         loadCurrentQuestion();
     }
 
+    private void captureCurrentInput() {
+        if (currentQuestion == null) return;
+        currentQuestion.userAnswer = answerArea.getText().trim();
+        currentQuestion.rating = selectedRating;
+    }
+
     private void endSession() {
-        // Save last question
-        if (currentQuestion != null) {
-            currentQuestion.userAnswer = answerArea.getText().trim();
-            currentQuestion.rating = selectedRating;
-            if (selectedRating > 0) { ratingSum += selectedRating; ratingCount++; }
+        captureCurrentInput();
+
+        if (!hasMeaningfulSessionWork()) {
+            state = SessionState.HOME;
+            cards.show(mainCards, "home");
+            return;
         }
 
-        // Increment session count
+        state = SessionState.RESULT;
         int sessions = UserProfileCache.getMockInterviews() + 1;
         UserProfileCache.setMockInterviews(sessions);
-        StatsService.saveMockInterviews(UserProfileCache.getCurrentUserId(), sessions);
-
+        int userId = UserProfileCache.getCurrentUserId();
+        if (userId != -1) {
+            StatsService.saveMockInterviews(userId, sessions);
+        }
+        refreshSessionCount();
         showResult();
     }
 
+    private boolean hasMeaningfulSessionWork() {
+        for (InterviewQuestion q : sessionOrder) {
+            if (q.completed || q.rating > 0 || !q.userAnswer.isBlank()) return true;
+        }
+        return false;
+    }
+
     private void showResult() {
-        // Build all answered questions from historyStack + remaining
-        List<InterviewQuestion> allAnswered = new ArrayList<>(historyStack);
-        Collections.reverse(allAnswered); // chronological order
-        sessionQueue.forEach(allAnswered::add);
-
-        double avgRating = ratingCount > 0 ? (double) ratingSum / ratingCount : 0;
-
-        JPanel result = buildResultPanel(allAnswered, avgRating);
-        mainCards.add(result, "result");
+        if (resultPanel != null) {
+            mainCards.remove(resultPanel);
+        }
+        resultPanel = buildResultPanel();
+        mainCards.add(resultPanel, "result");
         cards.show(mainCards, "result");
     }
 
-    private JPanel buildResultPanel(List<InterviewQuestion> answered, double avgRating) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setOpaque(false);
-        panel.setBorder(new EmptyBorder(20, 32, 20, 32));
+    private JPanel buildResultPanel() {
+        JPanel root = new JPanel(new BorderLayout(0, 18));
+        root.setOpaque(false);
+        root.setBorder(new EmptyBorder(22, 24, 24, 24));
 
-        // Summary card
-        ElevatedCard summary = new ElevatedCard(new BorderLayout());
-        JPanel sumInner = new JPanel(new BorderLayout(0, 8));
-        sumInner.setOpaque(false);
-        sumInner.setBorder(new EmptyBorder(20, 24, 20, 24));
+        GradientCard summary = new GradientCard(new BorderLayout(18, 0), INDIGO, TEAL);
+        summary.setBorder(new EmptyBorder(24, 26, 24, 26));
+        summary.setPreferredSize(new Dimension(0, 150));
 
-        String emoji = avgRating >= 4 ? "🎉" : avgRating >= 3 ? "👍" : "💪";
-        JLabel header = new JLabel(emoji + "  Interview Complete!");
-        header.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        header.setForeground(Theme.PRIMARY_TEXT);
+        double avgRating = averageRating();
+        JPanel copy = new JPanel();
+        copy.setOpaque(false);
+        copy.setLayout(new BoxLayout(copy, BoxLayout.Y_AXIS));
+        JLabel title = new JLabel("Interview Session Complete");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 25));
+        title.setForeground(Color.WHITE);
+        JLabel sub = new JLabel("Average self-rating " + formatRating(avgRating) + " / 5 across " + ratedCount() + " rated responses.");
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        sub.setForeground(new Color(255, 255, 255, 220));
+        copy.add(title);
+        copy.add(Box.createVerticalStrut(6));
+        copy.add(sub);
 
-        JLabel ratingLbl = new JLabel("Average self-rating: " + String.format("%.1f", avgRating) + " / 5.0  ⭐");
-        ratingLbl.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        ratingLbl.setForeground(Theme.MUTED_TEXT);
+        JPanel stats = new JPanel(new GridLayout(1, 3, 10, 0));
+        stats.setOpaque(false);
+        stats.setPreferredSize(new Dimension(360, 0));
+        stats.add(heroStat("Answered", String.valueOf(answeredCount())));
+        stats.add(heroStat("Avg Rating", formatRating(avgRating)));
+        stats.add(heroStat("Sessions", String.valueOf(UserProfileCache.getMockInterviews())));
 
-        JLabel sessLbl = new JLabel("Total mock interviews completed: " + UserProfileCache.getMockInterviews());
-        sessLbl.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        sessLbl.setForeground(new Color(99, 102, 241));
+        summary.add(copy, BorderLayout.CENTER);
+        summary.add(stats, BorderLayout.EAST);
 
-        sumInner.add(header, BorderLayout.NORTH);
-        sumInner.add(ratingLbl, BorderLayout.CENTER);
-        sumInner.add(sessLbl, BorderLayout.SOUTH);
-        summary.add(sumInner, BorderLayout.CENTER);
+        JPanel body = new JPanel(new GridBagLayout());
+        body.setOpaque(false);
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.gridy = 0;
+        gc.fill = GridBagConstraints.BOTH;
+        gc.weighty = 1;
 
-        // Review list
-        JPanel reviewList = new JPanel();
-        reviewList.setLayout(new BoxLayout(reviewList, BoxLayout.Y_AXIS));
-        reviewList.setOpaque(false);
-        reviewList.setBorder(new EmptyBorder(16, 0, 8, 0));
+        gc.gridx = 0;
+        gc.weightx = 0.34;
+        gc.insets = new Insets(0, 0, 0, 14);
+        body.add(buildResultStatsPanel(), gc);
 
-        JLabel reviewTitle = new JLabel("📋 Review Your Answers");
-        reviewTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        reviewTitle.setForeground(Theme.PRIMARY_TEXT);
-        reviewTitle.setBorder(new EmptyBorder(0, 0, 10, 0));
-        reviewList.add(reviewTitle);
+        gc.gridx = 1;
+        gc.weightx = 0.66;
+        gc.insets = new Insets(0, 0, 0, 0);
+        body.add(buildReviewPanel(), gc);
 
-        for (InterviewQuestion q : answered) {
-            reviewList.add(buildReviewCard(q));
-            reviewList.add(Box.createVerticalStrut(8));
-        }
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        actions.setOpaque(false);
+        JButton homeBtn = createOutlineButton("Back to Setup", SLATE);
+        JButton againBtn = createGradientButton("New Session", 160, 42);
+        homeBtn.addActionListener(e -> {
+            state = SessionState.HOME;
+            cards.show(mainCards, "home");
+        });
+        againBtn.addActionListener(e -> startSession(questionCountSlider.getValue()));
+        actions.add(homeBtn);
+        actions.add(againBtn);
 
-        JScrollPane scroll = new JScrollPane(reviewList);
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(12);
+        root.add(summary, BorderLayout.NORTH);
+        root.add(body, BorderLayout.CENTER);
+        root.add(actions, BorderLayout.SOUTH);
+        return root;
+    }
 
-        JButton homeBtn = createGradientButton("🔄 New Session", 160, 38);
-        homeBtn.addActionListener(e -> cards.show(mainCards, "home"));
-        JPanel btnRow = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        btnRow.setOpaque(false);
-        btnRow.setBorder(new EmptyBorder(10, 0, 0, 0));
-        btnRow.add(homeBtn);
+    private JPanel buildResultStatsPanel() {
+        SurfacePanel panel = new SurfacePanel(new BorderLayout(0, 14));
+        panel.setBorder(new EmptyBorder(18, 18, 18, 18));
 
-        panel.add(summary, BorderLayout.NORTH);
-        panel.add(scroll, BorderLayout.CENTER);
-        panel.add(btnRow, BorderLayout.SOUTH);
+        JPanel stats = new JPanel(new GridLayout(4, 1, 0, 10));
+        stats.setOpaque(false);
+        stats.add(statRow("Answered", new JLabel(answeredCount() + "/" + sessionOrder.size()), INDIGO));
+        stats.add(statRow("Rated", new JLabel(String.valueOf(ratedCount())), ORANGE));
+        stats.add(statRow("Longest Answer", new JLabel(longestAnswerLength() + " chars"), TEAL));
+        stats.add(statRow("Top Track", new JLabel(strongestCategory()), GREEN));
+
+        JPanel tips = new JPanel(new GridLayout(2, 1, 0, 12));
+        tips.setOpaque(false);
+        tips.add(infoCard("What to improve", "Low-rated answers usually need clearer structure, stronger examples, or tighter wording.", ORANGE));
+        tips.add(infoCard("Next pass", "Repeat the same category and aim to improve one answer at a time, not all at once.", GREEN));
+
+        panel.add(sectionLabel("Session Readout"), BorderLayout.NORTH);
+        panel.add(stats, BorderLayout.CENTER);
+        panel.add(tips, BorderLayout.SOUTH);
         return panel;
     }
 
-    private ElevatedCard buildReviewCard(InterviewQuestion q) {
-        ElevatedCard card = new ElevatedCard(new BorderLayout());
-        JPanel inner = new JPanel(new BorderLayout(0, 8));
-        inner.setOpaque(false);
-        inner.setBorder(new EmptyBorder(14, 16, 14, 16));
+    private JPanel buildReviewPanel() {
+        SurfacePanel panel = new SurfacePanel(new BorderLayout(0, 12));
+        panel.setBorder(new EmptyBorder(18, 18, 18, 18));
+        panel.add(sectionLabel("Answer Review"), BorderLayout.NORTH);
 
-        JLabel qLabel = new JLabel("<html><b>" + q.question + "</b></html>");
-        qLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        qLabel.setForeground(Theme.PRIMARY_TEXT);
+        JPanel list = new JPanel();
+        list.setOpaque(false);
+        list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
 
-        JLabel stars = new JLabel(q.rating > 0 ? "⭐".repeat(q.rating) + " (" + q.rating + "/5)" : "Not rated");
-        stars.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 12));
-        stars.setForeground(new Color(245, 158, 11));
+        for (InterviewQuestion q : sessionOrder) {
+            list.add(buildReviewCard(q));
+            list.add(Box.createVerticalStrut(10));
+        }
 
-        String ansText = q.userAnswer.isEmpty() ? "(No answer given)" : q.userAnswer;
-        JTextArea ansDisplay = new JTextArea(ansText);
-        ansDisplay.setEditable(false);
-        ansDisplay.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        ansDisplay.setForeground(Theme.MUTED_TEXT);
-        ansDisplay.setOpaque(false);
-        ansDisplay.setLineWrap(true);
-        ansDisplay.setWrapStyleWord(true);
-        ansDisplay.setBorder(null);
+        JScrollPane scroll = new JScrollPane(list);
+        scroll.setBorder(null);
+        scroll.getViewport().setOpaque(false);
+        scroll.setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(12);
 
-        inner.add(qLabel, BorderLayout.NORTH);
-        inner.add(ansDisplay, BorderLayout.CENTER);
-        inner.add(stars, BorderLayout.SOUTH);
-        card.add(inner, BorderLayout.CENTER);
+        panel.add(scroll, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel buildReviewCard(InterviewQuestion q) {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(0, 10));
+        card.setAccent(categoryColor(q.category));
+        card.setBorder(new EmptyBorder(14, 16, 14, 14));
+
+        JLabel title = new JLabel("<html><b>" + escapeHtml(q.question) + "</b></html>");
+        title.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        title.setForeground(Theme.PRIMARY_TEXT);
+
+        JLabel meta = new JLabel(q.category + " / Rating " + (q.rating == 0 ? "Not set" : q.rating + " of 5"));
+        meta.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        meta.setForeground(categoryColor(q.category));
+
+        JTextArea answer = new JTextArea(q.userAnswer.isBlank() ? "(No answer written)" : q.userAnswer);
+        answer.setEditable(false);
+        answer.setLineWrap(true);
+        answer.setWrapStyleWord(true);
+        answer.setOpaque(false);
+        answer.setBorder(null);
+        answer.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        answer.setForeground(Theme.MUTED_TEXT);
+
+        card.add(title, BorderLayout.NORTH);
+        card.add(answer, BorderLayout.CENTER);
+        card.add(meta, BorderLayout.SOUTH);
         return card;
     }
 
     /* ============================================================ */
-    /*  STAR RATING                                                 */
+    /*  RATING + LIVE STATS                                        */
     /* ============================================================ */
-    private void setRating(int rating) {
-        selectedRating = rating;
-        updateStars(rating);
+    private JButton createRatingButton(int rating) {
+        JButton btn = new JButton(String.valueOf(rating));
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setPreferredSize(new Dimension(36, 32));
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
     }
 
-    private void updateStars(int rating) {
-        for (int i = 0; i < 5; i++) {
-            starBtns[i].setText(i < rating ? "★" : "☆");
+    private void setRating(int rating) {
+        selectedRating = rating;
+        updateRatingButtons();
+        syncSessionStats();
+    }
+
+    private void updateRatingButtons() {
+        for (int i = 0; i < ratingButtons.length; i++) {
+            boolean selected = i < selectedRating;
+            JButton btn = ratingButtons[i];
+            btn.setForeground(selected ? Color.WHITE : ORANGE);
+            btn.setBackground(selected ? ORANGE : new Color(ORANGE.getRed(), ORANGE.getGreen(), ORANGE.getBlue(), Theme.isDark() ? 28 : 16));
+            btn.setBorder(BorderFactory.createLineBorder(ORANGE, 1, true));
+            btn.setOpaque(true);
         }
     }
 
+    private void onAnswerChanged() {
+        if (currentQuestion != null) {
+            currentQuestion.userAnswer = answerArea.getText().trim();
+        }
+        syncSessionStats();
+    }
+
+    private void syncSessionStats() {
+        int answered = answeredCount();
+        int total = sessionOrder.size();
+        progressLabel.setText(answered + " / " + total);
+        answeredLabel.setText(String.valueOf(answered));
+        avgRatingLabel.setText(ratedCount() == 0 ? "-" : formatRating(averageRating()));
+        qualityLabel.setText(answerQualityLabel(answerArea != null ? answerArea.getText().trim() : ""));
+    }
+
+    private int answeredCount() {
+        int count = 0;
+        for (InterviewQuestion q : sessionOrder) {
+            if (!q.userAnswer.isBlank()) count++;
+        }
+        return count;
+    }
+
+    private int completedCount() {
+        int count = 0;
+        for (InterviewQuestion q : sessionOrder) {
+            if (q.completed) count++;
+        }
+        return count;
+    }
+
+    private int ratedCount() {
+        int count = 0;
+        for (InterviewQuestion q : sessionOrder) {
+            if (q.rating > 0) count++;
+        }
+        return count;
+    }
+
+    private double averageRating() {
+        int sum = 0;
+        int count = 0;
+        for (InterviewQuestion q : sessionOrder) {
+            if (q.rating > 0) {
+                sum += q.rating;
+                count++;
+            }
+        }
+        return count == 0 ? 0.0 : (double) sum / count;
+    }
+
+    private String strongestCategory() {
+        Map<String, int[]> stats = new LinkedHashMap<>();
+        for (InterviewQuestion q : sessionOrder) {
+            if (q.rating <= 0) continue;
+            int[] row = stats.computeIfAbsent(q.category, k -> new int[2]);
+            row[0] += q.rating;
+            row[1]++;
+        }
+        String best = "None yet";
+        double bestAvg = -1;
+        for (Map.Entry<String, int[]> entry : stats.entrySet()) {
+            double avg = (double) entry.getValue()[0] / entry.getValue()[1];
+            if (avg > bestAvg) {
+                bestAvg = avg;
+                best = entry.getKey();
+            }
+        }
+        return best;
+    }
+
+    private int longestAnswerLength() {
+        int longest = 0;
+        for (InterviewQuestion q : sessionOrder) {
+            longest = Math.max(longest, q.userAnswer.length());
+        }
+        return longest;
+    }
+
+    private String answerQualityLabel(String answer) {
+        int length = answer.length();
+        if (length == 0) return "Empty";
+        if (length < 60) return "Too short";
+        if (length < 180) return "Decent start";
+        if (length < 320) return "Strong detail";
+        return "Very detailed";
+    }
+
+    private String formatRating(double rating) {
+        return String.format("%.1f", rating);
+    }
+
+    /* ============================================================ */
+    /*  THEME + HELPERS                                            */
+    /* ============================================================ */
     private void onThemeChange() {
         setBackground(Theme.PAGE_BG);
+        refreshSessionCount();
         if (answerArea != null) {
-            answerArea.setBackground(Theme.isDark() ? new Color(28,28,42) : new Color(248,249,252));
+            answerArea.setBackground(Theme.isDark() ? new Color(28, 32, 44) : new Color(250, 251, 253));
             answerArea.setForeground(Theme.PRIMARY_TEXT);
         }
         repaint();
     }
 
+    private void refreshSessionCount() {
+        if (sessionsLabel != null) {
+            sessionsLabel.setText("Sessions " + UserProfileCache.getMockInterviews());
+        }
+        if (selectedSummaryLabel != null) {
+            selectedSummaryLabel.setText(summaryText());
+        }
+    }
+
+    private void updateSelectedSummary() {
+        if (selectedSummaryLabel != null) {
+            selectedSummaryLabel.setText(summaryText());
+        }
+    }
+
+    private String summaryText() {
+        int desired = questionCountSlider == null ? 5 : questionCountSlider.getValue();
+        return selectedCategory + " / " + Math.min(desired, countQuestions(selectedCategory)) + " prompts / session review enabled";
+    }
+
+    private int countQuestions(String category) {
+        if ("All".equals(category)) return ALL_QUESTIONS.length;
+        int count = 0;
+        for (InterviewQuestion q : ALL_QUESTIONS) {
+            if (q.category.equals(category)) count++;
+        }
+        return count;
+    }
+
+    private Color categoryColor(String category) {
+        return switch (category) {
+            case "HR" -> GREEN;
+            case "Technical" -> TEAL;
+            case "Behavioral" -> ORANGE;
+            default -> INDIGO;
+        };
+    }
+
+    private String escapeHtml(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private String htmlText(String text, int width) {
+        return "<html><body style='width:" + width + "px'>" + escapeHtml(text) + "</body></html>";
+    }
+
     /* ============================================================ */
-    /*  BUTTON HELPERS                                              */
+    /*  VISUAL HELPERS                                             */
     /* ============================================================ */
+    private JToggleButton choiceTile(String title, String desc, Color accent) {
+        JToggleButton btn = new JToggleButton("<html><b>" + title + "</b><br><span style='font-size:9pt'>" + desc + "</span></html>") {
+            boolean hover = false;
+            {
+                setOpaque(false);
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { hover = true; repaint(); }
+                    public void mouseExited(MouseEvent e) { hover = false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                Color fill = isSelected()
+                    ? new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Theme.isDark() ? 88 : 34)
+                    : hover ? (Theme.isDark() ? new Color(42, 42, 58) : new Color(247, 248, 252)) : Theme.PANEL_BG;
+                g2.setColor(fill);
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                g2.setColor(isSelected() ? accent : Theme.FIELD_BORDER);
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                g2.setColor(accent);
+                g2.fillRoundRect(0, 10, 5, getHeight() - 20, 5, 5);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        btn.setForeground(Theme.PRIMARY_TEXT);
+        btn.setHorizontalAlignment(SwingConstants.LEFT);
+        btn.setBorder(new EmptyBorder(12, 18, 12, 12));
+        btn.setPreferredSize(new Dimension(0, 90));
+        return btn;
+    }
+
+    private JPanel heroStat(String label, String value) {
+        JPanel stat = new JPanel(new BorderLayout(0, 4));
+        stat.setOpaque(false);
+        stat.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 255, 255, 70), 1, true),
+            new EmptyBorder(12, 12, 12, 12)));
+        JLabel valueLbl = new JLabel(value);
+        valueLbl.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        valueLbl.setForeground(Color.WHITE);
+        JLabel labelLbl = new JLabel(label);
+        labelLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        labelLbl.setForeground(new Color(255, 255, 255, 210));
+        stat.add(valueLbl, BorderLayout.CENTER);
+        stat.add(labelLbl, BorderLayout.SOUTH);
+        return stat;
+    }
+
+    private JPanel statRow(String label, JLabel value, Color accent) {
+        SurfacePanel row = new SurfacePanel(new BorderLayout(8, 0));
+        row.setBorder(new EmptyBorder(10, 12, 10, 12));
+        JLabel name = new JLabel(label);
+        name.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        name.setForeground(Theme.MUTED_TEXT);
+        value.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        value.setForeground(accent);
+        row.add(name, BorderLayout.WEST);
+        row.add(value, BorderLayout.EAST);
+        return row;
+    }
+
+    private JPanel infoCard(String title, String body, Color accent) {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(0, 6));
+        card.setAccent(accent);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+        JLabel titleLbl = new JLabel(title);
+        titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        titleLbl.setForeground(Theme.PRIMARY_TEXT);
+        JLabel bodyLbl = new JLabel(htmlText(body, 230));
+        bodyLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        bodyLbl.setForeground(Theme.MUTED_TEXT);
+        card.add(titleLbl, BorderLayout.NORTH);
+        card.add(bodyLbl, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel contentCard(String title, JLabel bodyLabel, Color accent) {
+        SurfacePanel card = new SurfacePanel(new BorderLayout(0, 8));
+        card.setAccent(accent);
+        card.setBorder(new EmptyBorder(12, 14, 12, 12));
+        JLabel titleLbl = new JLabel(title);
+        titleLbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        titleLbl.setForeground(Theme.PRIMARY_TEXT);
+        bodyLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        bodyLabel.setForeground(Theme.MUTED_TEXT);
+        card.add(titleLbl, BorderLayout.NORTH);
+        card.add(bodyLabel, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JLabel sectionLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        label.setForeground(Theme.PRIMARY_TEXT);
+        return label;
+    }
+
+    private JLabel makeTinyLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        label.setForeground(Theme.MUTED_TEXT);
+        return label;
+    }
+
+    private JLabel makePillLabel(String text, Color color, boolean filled) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        label.setForeground(filled ? Color.WHITE : color);
+        label.setOpaque(true);
+        label.setBackground(filled ? color : new Color(color.getRed(), color.getGreen(), color.getBlue(), Theme.isDark() ? 34 : 16));
+        label.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(color.getRed(), color.getGreen(), color.getBlue(), 120), 1, true),
+            new EmptyBorder(6, 12, 6, 12)));
+        return label;
+    }
+
     private JButton createGradientButton(String text, int w, int h) {
         JButton btn = new JButton(text) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setPaint(new GradientPaint(0,0,Theme.PRIMARY_START,getWidth(),0,Theme.PRIMARY_END));
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),10,10));
-                g2.setFont(getFont()); g2.setColor(Color.WHITE);
+                g2.setPaint(new GradientPaint(0, 0, Theme.PRIMARY_START, getWidth(), 0, Theme.PRIMARY_END));
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 12, 12));
+                g2.setFont(getFont());
+                g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(),(getWidth()-fm.stringWidth(getText()))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
+                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
+                    (getHeight() + fm.getAscent() - fm.getDescent()) / 2);
                 g2.dispose();
             }
         };
         btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
         btn.setPreferredSize(new Dimension(w, h));
-        btn.setContentAreaFilled(false); btn.setBorderPainted(false); btn.setFocusPainted(false);
+        btn.setContentAreaFilled(false);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
     }
@@ -698,11 +1151,65 @@ public class MockInterviewPanel extends JPanel {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
         btn.setForeground(color);
-        btn.setBackground(new Color(color.getRed(),color.getGreen(),color.getBlue(),18));
+        btn.setBackground(new Color(color.getRed(), color.getGreen(), color.getBlue(), Theme.isDark() ? 28 : 16));
         btn.setBorder(BorderFactory.createLineBorder(color, 1, true));
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.setPreferredSize(new Dimension(130, 38));
         return btn;
+    }
+
+    /* ============================================================ */
+    /*  CUSTOM PANELS                                              */
+    /* ============================================================ */
+    private static class GradientCard extends JPanel {
+        private final Color start;
+        private final Color end;
+
+        GradientCard(LayoutManager layout, Color start, Color end) {
+            super(layout);
+            this.start = start;
+            this.end = end;
+            setOpaque(false);
+        }
+
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setPaint(new GradientPaint(0, 0, start, getWidth(), getHeight(), end));
+            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 18, 18);
+            g2.setColor(new Color(255, 255, 255, 50));
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 18, 18);
+            g2.dispose();
+            super.paintComponent(g);
+        }
+    }
+
+    private static class SurfacePanel extends JPanel {
+        private Color accent;
+
+        SurfacePanel(LayoutManager layout) {
+            super(layout);
+            setOpaque(false);
+        }
+
+        void setAccent(Color accent) {
+            this.accent = accent;
+        }
+
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Theme.PANEL_BG);
+            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+            g2.setColor(Theme.FIELD_BORDER);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+            if (accent != null) {
+                g2.setColor(accent);
+                g2.fillRoundRect(0, 0, 5, getHeight(), 5, 5);
+            }
+            g2.dispose();
+            super.paintComponent(g);
+        }
     }
 }
